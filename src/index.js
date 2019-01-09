@@ -97,6 +97,9 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					               	h_line.attr('d', line) // without non-scaling stroke, quite wasteful
 				               	); //Object.assign({}, , { y: 1 }))); // scale only X
 				               	h_x_ax.call(x_ax);
+
+				               	// update brushes
+				               	updateBrushes();
 				               });
 				zoom_subj.pipe(
 					bufferCount(10),
@@ -132,7 +135,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 				function newBrush() {
 					var brush = d3.brushX()
-					    .extent([[0, 0], [+svg.attr('width'), +svg.attr('height')]])
+					    .extent([[0, 0], [x((x.domain())[1]), +svg.attr('height')]])
 					    .on("start", brushstart)
 					    .on("brush", brushed)
 					    .on("end", brushend);
@@ -184,13 +187,35 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					}
 				}
 
+				function updateBrushes() {
+					var brushSelection = gBrushes
+					    .selectAll('.brush')
+					    .data(brushes, function (d){return d.id});
+
+					// moves the brushes to the correct location on the x axis
+					brushSelection.each(function(brushObject) {
+				    	// set some default values of the brushes using the x timescale
+					    if (brushObject.id == 0) {
+					      brushObject.brush.move(d3.select(this), [
+					        x(new Date('Mon Jun 04 2018 21:56:29 GMT-0400')),
+					        x(new Date('Mon Jun 04 2018 21:57:07 GMT-0400')),
+					      ]);
+					    } else if (brushObject.id == 1) {
+					      brushObject.brush.move(d3.select(this), [
+					        x(new Date('Mon Jun 04 2018 22:15:00 GMT-0400')),
+					        x(new Date('Mon Jun 04 2018 22:45:00 GMT-0400')),
+					      ]);
+					    }
+					});
+
+				}
+
 				function drawBrushes() {
 				  	var brushSelection = gBrushes
 					    .selectAll('.brush')
 					    .data(brushes, function (d){return d.id});
-					console.log('Brushes array len:');
-					console.log(brushes.length);
-					// Set up new brushes
+
+					// Set up new brushes only
 				  	brushSelection.enter()
 					    .insert("g", '.brush')
 					    .attr('class', 'brush')
@@ -199,16 +224,16 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					    	//call the brush
 					    	brushObject.brush(d3.select(this));
 
-					    	// set some default values of the brushes
+					    	// set some default values of two brushes
 						    if (brushObject.id == 0) {
 						      brushObject.brush.move(d3.select(this), [
-						        10, //x(new Date(2015, 7, 1)),
-						        20 //x(new Date(2016, 7, 1)),
+						        x(new Date('Mon Jun 04 2018 21:56:29 GMT-0400')),
+						        x(new Date('Mon Jun 04 2018 21:57:07 GMT-0400')),
 						      ]);
 						    } else if (brushObject.id == 1) {
 						      brushObject.brush.move(d3.select(this), [
-						        400, // x(new Date(2012, 7, 1)),
-						        500, // x(new Date(2013, 7, 1)),
+						        x(new Date('Mon Jun 04 2018 22:15:00 GMT-0400')),
+						        x(new Date('Mon Jun 04 2018 22:45:00 GMT-0400')),
 						      ]);
 						    }
 					    });
