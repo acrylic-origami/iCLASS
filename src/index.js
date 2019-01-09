@@ -14,13 +14,11 @@ const hash = document.location.hash.substring(1);
 
 const maybe_annotation = params.get('annotation');
 // const maybe_dataset = params.get('dataset');
-const maybe_dataset = 'EDMSE_pat_FR_1096_002.mat';
-
+const maybe_dataset = 'EDMSE_pat_FR_1096_050.mat';
 if(maybe_annotation != null || maybe_dataset != null) {
 	const F_initial_range = (() => {
 		const maybe_start = params.get('start');
 		const maybe_range = params.get('range');
-		
 		if(maybe_annotation != null) {
 			return d3.json(`annotation?id=${maybe_annotation}`).then([d.dataset, [d.start, d.range]]);
 		}
@@ -36,6 +34,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 	window.addEventListener('load', e => {
 		const svg = d3.select('svg');
 		const area = svg.append('g');
+		const brushList = document.getElementById('brush-list');
 
 		F_initial_range.then(
 			([dataset, [start, range]]) => Q.all([
@@ -92,6 +91,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				               	const new_domain = tf.rescaleX(x0).domain();
 				               	zoom_subj.next(new_domain);
 				               	x.domain(new_domain);
+
 				               	h_lines.forEach(h_line =>
 					               	// h_line.attr('transform', `translate(${tf.x} 0) scale(${tf.k} 1)`) // assuming non-scaling stroke; much better performance
 					               	h_line.attr('d', line) // without non-scaling stroke, quite wasteful
@@ -120,6 +120,174 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				   .attr("width", +svg.attr('width'))
 				   .attr("height", +svg.attr('height'))
 				   .call(zoom);
+
+				/***** MULTIPLE BRUSHES ******/
+
+				// We initially generate a SVG group to keep our brushes' DOM elements in:
+				const gBrushes = svg.append('g')
+					.attr("class", "brushes");
+
+				// We also keep the actual d3-brush functions and their IDs in a list:
+				const brushes = [];
+
+				function newBrush() {
+					var brush = d3.brushX()
+					    .extent([[0, 0], [+svg.attr('width'), +svg.attr('height')]])
+					    .on("start", brushstart)
+					    .on("brush", brushed)
+					    .on("end", brushend);
+
+					brushes.push({id: brushes.length, brush: brush});
+
+					// if(brushes.length == 1) {
+					// 	console.log("a");
+					// 	brush.move(null, [0, 50]);
+					// }
+
+				  	function brushstart() {
+				    	// your stuff here
+				    	console.log("brushstart()");
+					};
+
+					function brushed() {
+				    	// your stuff here
+				    	console.log("brushed() ");
+				    	const extent = brush.extent().call();
+				    	const extWidth = extent[1][0] - extent[0][0];
+				    	const { selection } = d3.event;
+				    	const selWidth = selection[1] - selection[0];
+				    	const tRange = x.domain();
+				    	const timeWidth = tRange[1] - tRange[0];
+				    	const selStart = new Date((selection[0]/extWidth)*timeWidth + tRange[0].getTime());
+				    	const selEnd = new Date((selection[1]/extWidth)*timeWidth + tRange[0].getTime());
+				    	console.log(selStart);
+				    	console.log(selEnd);
+					}
+
+					function brushend() {
+						console.log("brushend()");
+				    	// Figure out if our latest brush has a selection
+				    	var lastBrushID = brushes[brushes.length - 1].id;
+				    	var lastBrush = document.getElementById('brush-' + lastBrushID);
+				    	var selection = d3.brushSelection(lastBrush);
+
+				    	// If it does, that means we need another one
+				    	if (selection && selection[0] !== selection[1]) {
+				      		// Add brush to DOM list
+				     		brushList.innerHTML += "<div>Annotation " + lastBrushID + "</div>";
+				      		// Add brush to graph
+				      		newBrush();
+				    	}
+
+				    	// Always draw brushes
+				    	drawBrushes();
+					}
+				}
+
+				function drawBrushes() {
+				  	var brushSelection = gBrushes
+					    .selectAll('.brush')
+					    .data(brushes, function (d){return d.id});
+					console.log('Brushes array len:');
+					console.log(brushes.length);
+					// Set up new brushes
+				  	brushSelection.enter()
+					    .insert("g", '.brush')
+					    .attr('class', 'brush')
+					    .attr('id', function(brush){ return "brush-" + brush.id; })
+					    .each(function(brushObject) {
+					    	//call the brush
+					    	brushObject.brush(d3.select(this));
+
+					    	// set some default values of the brushes
+						    if (brushObject.id == 0) {
+						      brushObject.brush.move(d3.select(this), [
+						        10, //x(new Date(2015, 7, 1)),
+						        20 //x(new Date(2016, 7, 1)),
+						      ]);
+						    } else if (brushObject.id == 1) {
+						      brushObject.brush.move(d3.select(this), [
+						        400, // x(new Date(2012, 7, 1)),
+						        500, // x(new Date(2013, 7, 1)),
+						      ]);
+						    }
+					    });
+
+					/* REMOVE POINTER EVENTS ON BRUSH OVERLAYS
+					 *
+					 * This part is abbit tricky and requires knowledge of how brushes are implemented.
+					 * They register pointer events on a .overlay rectangle within them.
+					 * For existing brushes, make sure we disable their pointer events on their overlay.
+					 * This frees the overlay for the most current (as of yet with an empty selection) brush to listen for click and drag events
+					 * The moving and resizing is done with other parts of the brush, so that will still work.
+					 */
+				  	brushSelection
+					    .each(function (brushObject){
+					      d3.select(this)
+ 					        .selectAll('.overlay')
+					        .style('pointer-events', function() {
+					          var brush = brushObject.brush;
+					          if (brushObject.id === brushes.length-1 && brush !== undefined) {
+					            return 'all';
+					          } else {
+					            return 'none';
+					          }
+					        });
+					    });
+
+				  	brushSelection.exit()
+				    	.remove();
+				}
+
+				newBrush();
+				newBrush();
+				newBrush();
+				drawBrushes();
+
+
+
+				/***** ONE BRUSH *******/
+
+				/*
+				const brush = d3.brushX()
+    				.extent([[0, 0], [+svg.attr('width'), +svg.attr('height')]])
+    				.on("brush end", brushed);
+
+    			const context = svg.append("g")
+    				.attr("class", "context")
+    				.attr("transform", "translate(0,0)");
+
+				svg.append("g")
+    				.attr("class", "brush")
+    				.call(d3.brushX().on("brush", brushed));
+
+    			context.append("path")
+				    .datum(data)
+				    .attr("class", "area")
+				    .attr("d", area2);
+
+				context.append("g")
+					.attr("class", "axis axis--x")
+					.attr("transform", "translate(0," + +svg.attr('height') + ")")
+					.call(x_ax);
+
+				context.append("g")
+					.attr("class", "brush")
+					.call(brush)
+					.call(brush.move, x.range());
+
+
+				function brushed() {
+				  if (d3.event.sourceEvent && d3.event.sourceEvent.type === "zoom") return; // ignore brush-by-zoom
+				  var s = d3.event.selection || x.range();
+				  x.domain(s.map(x.invert, x));
+				  focus.select(".area").attr("d", area);
+				  focus.select(".axis--x").call(xAxis);
+				  svg.select(".zoom").call(zoom.transform, d3.zoomIdentity
+				      .scale(width / (s[1] - s[0]))
+				      .translate(-s[0], 0));
+				}
+				*/
 			}, console.log).catch(console.log);
 	});
 }
