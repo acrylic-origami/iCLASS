@@ -118,11 +118,6 @@ if(maybe_annotation != null || maybe_dataset != null) {
 								}
 							}, console.log).catch(console.log)
 					});
-				svg.append("rect")
-				   .attr("class", "zoom")
-				   .attr("width", +svg.attr('width'))
-				   .attr("height", +svg.attr('height'))
-				   .call(zoom);
 
 				/***** MULTIPLE BRUSHES ******/
 
@@ -130,22 +125,26 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				const gBrushes = svg.append('g')
 					.attr("class", "brushes");
 
+				svg.append("rect")
+				   .attr("class", "zoom")
+				   .attr("id", "zoom")
+				   .attr("width", +svg.attr('width'))
+				   .attr("height", +svg.attr('height'))
+				   .call(zoom);
+
 				// We also keep the actual d3-brush functions and their IDs in a list:
 				const brushes = [];
 
 				function newBrush() {
+					console.log("newBrush()");
+
 					var brush = d3.brushX()
 					    .extent([[0, 0], [x((x.domain())[1]), +svg.attr('height')]])
 					    .on("start", brushstart)
 					    .on("brush", brushed)
 					    .on("end", brushend);
 
-					brushes.push({id: brushes.length, brush: brush});
-
-					// if(brushes.length == 1) {
-					// 	console.log("a");
-					// 	brush.move(null, [0, 50]);
-					// }
+					brushes.push({id: brushes.length, brush: brush, times: []});
 
 				  	function brushstart() {
 				    	// your stuff here
@@ -155,27 +154,16 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					function brushed() {
 				    	// your stuff here
 				    	console.log("brushed() ");
-				    	const extent = brush.extent().call();
-				    	const extWidth = extent[1][0] - extent[0][0];
-				    	const { selection } = d3.event;
-				    	const selWidth = selection[1] - selection[0];
-				    	const tRange = x.domain();
-				    	const timeWidth = tRange[1] - tRange[0];
-				    	const selStart = new Date((selection[0]/extWidth)*timeWidth + tRange[0].getTime());
-				    	const selEnd = new Date((selection[1]/extWidth)*timeWidth + tRange[0].getTime());
-				    	console.log(selStart);
-				    	console.log(selEnd);
 					}
 
 					function brushend() {
-						console.log("brushend()");
 				    	// Figure out if our latest brush has a selection
-				    	var lastBrushID = brushes[brushes.length - 1].id;
-				    	var lastBrush = document.getElementById('brush-' + lastBrushID);
-				    	var selection = d3.brushSelection(lastBrush);
+				    	const lastBrushID = brushes[brushes.length - 1].id;
+				    	const lastBrush = document.getElementById('brush-' + lastBrushID);
+				    	const lastSelection = d3.brushSelection(lastBrush);
 
 				    	// If it does, that means we need another one
-				    	if (selection && selection[0] !== selection[1]) {
+				    	if (lastSelection && lastSelection[0] !== lastSelection[1]) {
 				      		// Add brush to DOM list
 				     		brushList.innerHTML += "<div>Annotation " + lastBrushID + "</div>";
 				      		// Add brush to graph
@@ -184,36 +172,57 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 				    	// Always draw brushes
 				    	drawBrushes();
+
+				    	// store/update the value of the selection for the current brush
+				    	const brushId = brushes.findIndex(x => x.brush == brush);
+
+				    	const extent = brush.extent().call();
+				    	const extWidth = extent[1][0] - extent[0][0];
+				    	const brushElem = document.getElementById('brush-' + brushId);
+				    	const selection = d3.brushSelection(brushElem);
+
+				    	// if a selection exists, store the selected time
+				    	if (selection && selection[0] !== selection[1]) {
+					    	const selWidth = selection[1] - selection[0];
+					    	const tRange = x.domain();
+					    	const timeWidth = tRange[1] - tRange[0];
+					    	const selStart = new Date((selection[0]/extWidth)*timeWidth + tRange[0].getTime());
+					    	const selEnd = new Date((selection[1]/extWidth)*timeWidth + tRange[0].getTime());
+					    	// update brushes array with new start and end times
+					    	brushes[brushId].times = [selStart, selEnd];
+					    }
 					}
 				}
 
 				function updateBrushes() {
-					var brushSelection = gBrushes
+					console.log("updateBrushes()");
+
+					const brushSelection = gBrushes
 					    .selectAll('.brush')
 					    .data(brushes, function (d){return d.id});
 
 					// moves the brushes to the correct location on the x axis
 					brushSelection.each(function(brushObject) {
 				    	// set some default values of the brushes using the x timescale
-					    if (brushObject.id == 0) {
-					      brushObject.brush.move(d3.select(this), [
-					        x(new Date('Mon Jun 04 2018 21:56:29 GMT-0400')),
-					        x(new Date('Mon Jun 04 2018 21:57:07 GMT-0400')),
-					      ]);
-					    } else if (brushObject.id == 1) {
-					      brushObject.brush.move(d3.select(this), [
-					        x(new Date('Mon Jun 04 2018 22:15:00 GMT-0400')),
-					        x(new Date('Mon Jun 04 2018 22:45:00 GMT-0400')),
-					      ]);
-					    }
+
+				    	// update the brushes according to reflect their selected time
+						if(brushes[brushObject.id].times.length == 2 && brushes[brushObject.id].times !== []) {
+							brushObject.brush.move(d3.select(this), [
+								x(brushes[brushObject.id].times[0]),
+								x(brushes[brushObject.id].times[1])
+							]);
+						}
+
 					});
 
 				}
 
 				function drawBrushes() {
-				  	var brushSelection = gBrushes
+				  	const brushSelection = gBrushes
 					    .selectAll('.brush')
 					    .data(brushes, function (d){return d.id});
+
+					console.log("drawBrushes()");
 
 					// Set up new brushes only
 				  	brushSelection.enter()
@@ -223,19 +232,6 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					    .each(function(brushObject) {
 					    	//call the brush
 					    	brushObject.brush(d3.select(this));
-
-					    	// set some default values of two brushes
-						    if (brushObject.id == 0) {
-						      brushObject.brush.move(d3.select(this), [
-						        x(new Date('Mon Jun 04 2018 21:56:29 GMT-0400')),
-						        x(new Date('Mon Jun 04 2018 21:57:07 GMT-0400')),
-						      ]);
-						    } else if (brushObject.id == 1) {
-						      brushObject.brush.move(d3.select(this), [
-						        x(new Date('Mon Jun 04 2018 22:15:00 GMT-0400')),
-						        x(new Date('Mon Jun 04 2018 22:45:00 GMT-0400')),
-						      ]);
-						    }
 					    });
 
 					/* REMOVE POINTER EVENTS ON BRUSH OVERLAYS
@@ -260,59 +256,25 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					        });
 					    });
 
+					// remove brushes that no longer exist on the selection
 				  	brushSelection.exit()
 				    	.remove();
 				}
 
 				newBrush();
-				newBrush();
-				newBrush();
 				drawBrushes();
 
+				// Simple button for toggling zoom/edit
+				const ezToggle = document.getElementById('edit-zoom-toggle');
+				const zoomRect = document.getElementById('zoom');
+				ezToggle.addEventListener("click", function() {
+					if (zoomRect.style.display === "none") {
+						zoomRect.style.display = "block";
+					} else {
+						zoomRect.style.display = "none";
+					}
+				});
 
-
-				/***** ONE BRUSH *******/
-
-				/*
-				const brush = d3.brushX()
-    				.extent([[0, 0], [+svg.attr('width'), +svg.attr('height')]])
-    				.on("brush end", brushed);
-
-    			const context = svg.append("g")
-    				.attr("class", "context")
-    				.attr("transform", "translate(0,0)");
-
-				svg.append("g")
-    				.attr("class", "brush")
-    				.call(d3.brushX().on("brush", brushed));
-
-    			context.append("path")
-				    .datum(data)
-				    .attr("class", "area")
-				    .attr("d", area2);
-
-				context.append("g")
-					.attr("class", "axis axis--x")
-					.attr("transform", "translate(0," + +svg.attr('height') + ")")
-					.call(x_ax);
-
-				context.append("g")
-					.attr("class", "brush")
-					.call(brush)
-					.call(brush.move, x.range());
-
-
-				function brushed() {
-				  if (d3.event.sourceEvent && d3.event.sourceEvent.type === "zoom") return; // ignore brush-by-zoom
-				  var s = d3.event.selection || x.range();
-				  x.domain(s.map(x.invert, x));
-				  focus.select(".area").attr("d", area);
-				  focus.select(".axis--x").call(xAxis);
-				  svg.select(".zoom").call(zoom.transform, d3.zoomIdentity
-				      .scale(width / (s[1] - s[0]))
-				      .translate(-s[0], 0));
-				}
-				*/
 			}, console.log).catch(console.log);
 	});
 }
