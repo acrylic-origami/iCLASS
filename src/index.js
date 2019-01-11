@@ -36,6 +36,9 @@ if(maybe_annotation != null || maybe_dataset != null) {
 		const area = svg.append('g');
 		const brushList = document.getElementById('brush-list');
 
+		const gBrushes = svg.append('g')
+			.attr("class", "brushes");
+			
 		F_initial_range.then(
 			([dataset, [start, range]]) => Q.all([
 				d3.json(`dataset_meta?dataset=${dataset}`),
@@ -70,7 +73,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 				const line = d3.line()
 				               .curve(d3.curveMonotoneX)
-				               .x(d => x(new Date(d[0])))
+				               .x(d => x0(new Date(d[0])))
 				               .y(d => y(d[1]));
 
 				const h_lines =
@@ -92,14 +95,16 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				               	zoom_subj.next(new_domain);
 				               	x.domain(new_domain);
 
-				               	h_lines.forEach(h_line =>
-					               	// h_line.attr('transform', `translate(${tf.x} 0) scale(${tf.k} 1)`) // assuming non-scaling stroke; much better performance
-					               	h_line.attr('d', line) // without non-scaling stroke, quite wasteful
-				               	); //Object.assign({}, , { y: 1 }))); // scale only X
+				               	h_lines.forEach(h_line => {
+				               		const tf_str = `translate(${tf.x} 0) scale(${tf.k} 1)`;
+					               	h_line.attr('transform', tf_str) // assuming non-scaling stroke; much better performance
+					               	gBrushes.attr('transform', tf_str)
+					               	// h_line.attr('d', line) // without non-scaling stroke, quite wasteful
+				               	}); //Object.assign({}, , { y: 1 }))); // scale only X
 				               	h_x_ax.call(x_ax);
 
 				               	// update brushes
-				               	updateBrushes();
+				               	// updateBrushes();
 				               });
 				zoom_subj.pipe(
 					bufferCount(10),
@@ -122,8 +127,6 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				/***** MULTIPLE BRUSHES ******/
 
 				// We initially generate a SVG group to keep our brushes' DOM elements in:
-				const gBrushes = svg.append('g')
-					.attr("class", "brushes");
 
 				svg.append("rect")
 				   .attr("class", "zoom")
@@ -180,6 +183,8 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				    	const extWidth = extent[1][0] - extent[0][0];
 				    	const brushElem = document.getElementById('brush-' + brushId);
 				    	const selection = d3.brushSelection(brushElem);
+				    	
+				    	console.log(selection);
 
 				    	// if a selection exists, store the selected time
 				    	if (selection && selection[0] !== selection[1]) {
