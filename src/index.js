@@ -134,7 +134,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 				// We also keep the actual d3-brush functions and their IDs in a list:
 				const brushes = [];
-				const brushCount = 0;
+				var brushCount = 0;
 
 				function newBrush() {
 					console.log("newBrush()");
@@ -145,7 +145,9 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					    .on("brush", brushed)
 					    .on("end", brushend);
 
-					brushes.push({id: brushes.length, brush: brush, times: []});
+					brushes.push({id: brushCount, brush: brush, times: []});
+					brushCount++;
+					console.log(brushCount);
 
 				  	function brushstart() {
 				    	// your stuff here
@@ -165,8 +167,10 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 				    	// If it does, that means we need another one
 				    	if (lastSelection && lastSelection[0] !== lastSelection[1]) {
-				      		// Add brush to DOM list
+
+				      		// Add brush to DOM list as this is the first time the brush has a selection
 				     		brushList.innerHTML += "<div class=\"seizure-wrap\" id=\"seizure-" + lastBrushID + "\">Seizure " + lastBrushID + "</div>";
+
 				      		// Add brush to graph
 				      		newBrush();
 				    	}
