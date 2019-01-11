@@ -134,6 +134,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 				// We also keep the actual d3-brush functions and their IDs in a list:
 				const brushes = [];
+				const brushCount = 0;
 
 				function newBrush() {
 					console.log("newBrush()");
@@ -165,7 +166,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				    	// If it does, that means we need another one
 				    	if (lastSelection && lastSelection[0] !== lastSelection[1]) {
 				      		// Add brush to DOM list
-				     		brushList.innerHTML += "<div>Annotation " + lastBrushID + "</div>";
+				     		brushList.innerHTML += "<div class=\"seizure-wrap\" id=\"seizure-" + lastBrushID + "\">Seizure " + lastBrushID + "</div>";
 				      		// Add brush to graph
 				      		newBrush();
 				    	}
@@ -190,6 +191,8 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					    	const selEnd = new Date((selection[1]/extWidth)*timeWidth + tRange[0].getTime());
 					    	// update brushes array with new start and end times
 					    	brushes[brushId].times = [selStart, selEnd];
+
+					    	// push changes servserside
 					    }
 					}
 				}
@@ -270,8 +273,10 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				ezToggle.addEventListener("click", function() {
 					if (zoomRect.style.display === "none") {
 						zoomRect.style.display = "block";
+						ezToggle.textContent = "Edit";
 					} else {
 						zoomRect.style.display = "none";
+						ezToggle.textContent = "Done";
 					}
 				});
 

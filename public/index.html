@@ -4,6 +4,11 @@
 			body, html {
 				width:100%;
 			}
+
+			.svg-wrap {
+				margin-left:200px;
+			}
+
 			.line {
 				stroke-width:2px;
 				vector-effect:non-scaling-stroke;
@@ -19,6 +24,18 @@
 				stroke: #000;
 				fill: red;
 			}
+
+			.brush-wrap{
+				position:absolute;
+				top:10px;
+				left:10px;
+				width:200px;
+			}
+
+			.seizure-wrap {
+				padding-top:5px;
+				padding-left:5px;
+			}
 		</style>
 		
 		<!-- <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
@@ -27,8 +44,12 @@
 	</head>
 	
 	<body>
-		<button class="edit-zoom-toggle" id="edit-zoom-toggle" type="button">Edit/Zoom</button>
-		<svg width="960" height="640"></svg>
-		<p class="brush-list" id="brush-list"></p>
+		<div class="svg-wrap">
+			<svg width="960" height="640"></svg>
+		</div>
+		<div class="brush-wrap" id="brush-wrap">
+			<button class="edit-zoom-toggle" id="edit-zoom-toggle" type="button">Edit</button>
+			<div class="brush-list" id="brush-list"></div>
+		</div>
 	</body>
 </html>
