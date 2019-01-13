@@ -133,20 +133,10 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				   .call(zoom);
 
 				// We also keep the actual d3-brush functions and their IDs in a list:
-				// const loadedBrushes = [
-				// 	{
-				// 		id: 0,
-				// 		times: [new Date('Mon Jun 04 2018 21:56:29 GMT-0400'), new Date('Mon Jun 04 2018 22:01:07 GMT-0400')]
-				// 	},
-				// 	{
-				// 		id: 2,
-				// 		times: [new Date('Mon Jun 04 2018 22:30:29 GMT-0400'), new Date('Mon Jun 04 2018 22:40:07 GMT-0400')]
-				// 	},
-				// ];
 				const brushes = [];
 				var brushCount = 0;
 
-				function newBrush(lBrush) {
+				function newBrush() {
 					console.log("newBrush()");
 
 					var brush = d3.brushX()
@@ -155,23 +145,8 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					    .on("brush", brushed)
 					    .on("end", brushend);
 
-					console.log(lBrush);
-
-					if(lBrush != null && lBrush != undefined) {
-						console.log("loaded brush " + lBrush.id);
-						brushes.push({id: lBrush.id, brush: brush, times: lBrush.times});
-						brushCount = parseInt(lBrush.id) + 1;
-					} else {
-						console.log("pushing empty brush " + brushCount);
-						console.log(brushes.slice());
-						const myArr = [1,1];
-						console.log(myArr);
-						// brushes.push({id: brushCount, brush: brush, times: [1, 1]});
-						console.log(brushes.slice());
-						console.log(brushes.slice());
-						brushCount++;
-					} 
-					console.log(brushes);
+					brushes.push({id: brushCount, brush: brush, times: []});
+					brushCount++;
 					console.log(brushCount);
 
 				  	function brushstart() {
@@ -186,7 +161,6 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 					function brushend() {
 				    	// Figure out if our latest brush has a selection
-				    	console.log("brushend()");
 				    	const lastBrushID = brushes[brushes.length - 1].id;
 				    	const lastBrush = document.getElementById('brush-' + lastBrushID);
 				    	const lastSelection = d3.brushSelection(lastBrush);
@@ -196,7 +170,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 				      		// Add brush to DOM list as this is the first time the brush has a selection
 				     		brushList.innerHTML += "<div class=\"seizure-wrap\" id=\"seizure-" + lastBrushID + "\">Seizure " + lastBrushID + "</div>";
-				     		console.log("new brush, lastId: " + lastBrushID);
+
 				      		// Add brush to graph
 				      		newBrush();
 				    	}
@@ -205,9 +179,8 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				    	drawBrushes();
 
 				    	// store/update the value of the selection for the current brush
-				    	const bIndex = brushes.findIndex(x => x.brush == brush);
-				    	console.log("brush end of array elem " + bIndex);
-				    	const brushId = brushes[bIndex].id;
+				    	const brushId = brushes.findIndex(x => x.brush == brush);
+
 				    	const extent = brush.extent().call();
 				    	const extWidth = extent[1][0] - extent[0][0];
 				    	const brushElem = document.getElementById('brush-' + brushId);
@@ -220,7 +193,6 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					    	const timeWidth = tRange[1] - tRange[0];
 					    	const selStart = new Date((selection[0]/extWidth)*timeWidth + tRange[0].getTime());
 					    	const selEnd = new Date((selection[1]/extWidth)*timeWidth + tRange[0].getTime());
-					    	console.log("adding times to " + brushId);
 					    	// update brushes array with new start and end times
 					    	brushes[brushId].times = [selStart, selEnd];
 
@@ -241,12 +213,10 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				    	// set some default values of the brushes using the x timescale
 
 				    	// update the brushes according to reflect their selected time
-						console.log("updateBrush");
-						if(brushObject.times.length == 2 && brushObject.times !== []) {
-							console.log("moving brush:" + brushObject.id);
+						if(brushes[brushObject.id].times.length == 2 && brushes[brushObject.id].times !== []) {
 							brushObject.brush.move(d3.select(this), [
-								x(brushObject.times[0]),
-								x(brushObject.times[1])
+								x(brushes[brushObject.id].times[0]),
+								x(brushes[brushObject.id].times[1])
 							]);
 						}
 
@@ -298,12 +268,8 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				    	.remove();
 				}
 
-				// Load brushes
-				loadedBrushes.forEach(function(lBrush) {
-					newBrush(lBrush);
-				});
+				newBrush();
 				drawBrushes();
-				updateBrushes();
 
 				// Simple button for toggling zoom/edit
 				const ezToggle = document.getElementById('edit-zoom-toggle');
