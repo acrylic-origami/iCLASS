@@ -133,16 +133,16 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				   .call(zoom);
 
 				// We also keep the actual d3-brush functions and their IDs in a list:
-				const loadedBrushes = [
-					{
-						id: 0,
-						times: [new Date('Mon Jun 04 2018 21:56:29 GMT-0400'), new Date('Mon Jun 04 2018 22:01:07 GMT-0400')]
-					},
-					{
-						id: 2,
-						times: [new Date('Mon Jun 04 2018 22:30:29 GMT-0400'), new Date('Mon Jun 04 2018 22:40:07 GMT-0400')]
-					},
-				];
+				// const loadedBrushes = [
+				// 	{
+				// 		id: 0,
+				// 		times: [new Date('Mon Jun 04 2018 21:56:29 GMT-0400'), new Date('Mon Jun 04 2018 22:01:07 GMT-0400')]
+				// 	},
+				// 	{
+				// 		id: 2,
+				// 		times: [new Date('Mon Jun 04 2018 22:30:29 GMT-0400'), new Date('Mon Jun 04 2018 22:40:07 GMT-0400')]
+				// 	},
+				// ];
 				const brushes = [];
 				var brushCount = 0;
 
