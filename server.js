@@ -5,12 +5,12 @@ const app = express();
 const Frac = require('fraction.js');
 
 const DENSITY = 100; // 100 data points per window width
-const f = new hdf5.File('/Users/sasha/Desktop/BCIResearch/EU_DATASET/EDMSE_pat_FR_1096_050.mat', require('hdf5/lib/globals.js').ACC_RDONLY)
+const f = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_003.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
 const g = f.openGroup('data');
 const Fs = h5lt.readDataset(g.id, 'Fs');
 const tstart = Date.parse(String.fromCharCode.apply(null, h5lt.readDataset(g.id, 'tstart')).replace('-', ' '));
 const data = new Map([ // TEMP
-	['EDMSE_pat_FR_1096_050.mat', [f, g, Fs[0], tstart]]
+	['EDMSE_pat_FR_1096_003.mat', [f, g, Fs[0], tstart]]
 ]);
 // app.get('/data', (req, res, next) => {
 // 	if(req.query.annotation != null && (req.query.start == null || req.query.range == null)) {
@@ -26,7 +26,7 @@ app.get('/data', (req, res) => {
 	// CONSISTENCY RULE: lower limit is included if equal; upper limit is excluded if equal
 	// expect req.query.zoom, req.query.start_N, req.query.start_D, req.query.end_N, req.query.end_D
 	// also expect (2^-zoom) divides (start - end)
-	const meta = data.get('EDMSE_pat_FR_1096_050.mat');
+	const meta = data.get('EDMSE_pat_FR_1096_003.mat');
 	const dims = meta[0].getDatasetDimensions('/data/signal');
 	
 	const frac_start = new Frac(parseInt(req.query.start_N)).div(parseInt(req.query.start_D));
@@ -62,7 +62,7 @@ app.get('/data', (req, res) => {
 })
 // TODO some redundancy in the data methods: fix later
 app.get('/annotation', (req, res) => {
-	res.send({ dataset: 'EDMSE_pat_FR_1096_050.mat', start: 4, range: 2 });
+	res.send({ dataset: 'EDMSE_pat_FR_1096_003.mat', start: 4, range: 2 });
 })
 app.get('/dataset_meta', (req, res) => {
 	// TODO: annotation <-> dataset
