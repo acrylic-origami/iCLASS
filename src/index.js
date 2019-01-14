@@ -7,7 +7,7 @@ import {debounceTime, bufferCount, map} from 'rxjs/operators';
 import TiledData from './TiledData';
 import {BASEGRAPH_ZOOM, EPS} from './consts';
 
-const channels = [0]; // TEMP
+const channels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // TEMP
 
 const params = new URLSearchParams(document.location.search.substring(1));
 const hash = document.location.hash.substring(1);
@@ -62,6 +62,8 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				            .range([+svg.attr('height'), 0])
 				            .domain(d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
+				const channel_offset = (y.domain()[1]-y.domain()[0])/(channels.length + 2); // +2 leaves gap at bottom and top
+
 				const x_ax = d3.axisBottom(x),
 				      y_ax = d3.axisLeft(y);
 				               
@@ -76,8 +78,8 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				const h_lines =
 					channels.map(ch =>
 						area.append('path')
-				          .data([flat_data.map(packet => [packet[0], packet[1][ch]])])
-				          .attr('class', 'line')
+				          .data([flat_data.map(packet => [packet[0], (packet[1][ch])/(channels.length - 2) + (ch + 1 - (channels.length)/2)*(channel_offset)])])
+				          .attr('class', 'line line-num-'+ch)
 				          .attr('d', line)
 				   );
 				
@@ -112,7 +114,7 @@ if(maybe_annotation != null || maybe_dataset != null) {
 								if(did_update) {
 									const data = data_controller.get_data();
 									for(let i = 0; i < channels.length; i++) {
-										h_lines[i].data([data.map(packet => [packet[0], packet[1][channels[i]]])])
+										h_lines[i].data([data.map(packet => [packet[0], (packet[1][channels[i]])/(channels.length - 2) + (i + 1 - (channels.length)/2)*(channel_offset)])])
 										          .attr('d', line);
 									}
 								}
@@ -137,7 +139,6 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				var brushCount = 0;
 
 				function newBrush() {
-					console.log("newBrush()");
 
 					var brush = d3.brushX()
 					    .extent([[0, 0], [x((x.domain())[1]), +svg.attr('height')]])
@@ -147,16 +148,13 @@ if(maybe_annotation != null || maybe_dataset != null) {
 
 					brushes.push({id: brushCount, brush: brush, times: []});
 					brushCount++;
-					console.log(brushCount);
 
 				  	function brushstart() {
 				    	// your stuff here
-				    	console.log("brushstart()");
 					};
 
 					function brushed() {
 				    	// your stuff here
-				    	console.log("brushed() ");
 					}
 
 					function brushend() {
@@ -202,7 +200,6 @@ if(maybe_annotation != null || maybe_dataset != null) {
 				}
 
 				function updateBrushes() {
-					console.log("updateBrushes()");
 
 					const brushSelection = gBrushes
 					    .selectAll('.brush')
@@ -229,7 +226,6 @@ if(maybe_annotation != null || maybe_dataset != null) {
 					    .selectAll('.brush')
 					    .data(brushes, function (d){return d.id});
 
-					console.log("drawBrushes()");
 
 					// Set up new brushes only
 				  	brushSelection.enter()
