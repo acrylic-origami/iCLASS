@@ -32,7 +32,7 @@ export default class extends React.Component {
 	});
 	
 	render = () => <div>
-		<button className="edit-zoom-toggle" id="edit-zoom-toggle" type="button" onClick={this.onEditZoomToggle}>Edit/Zoom</button>
+		<button className="edit-zoom-toggle" id="edit-zoom-toggle" type="button" onClick={this.onEditZoomToggle}>{this.state.is_editing ? 'Zoom/Pan' : 'Annotate'}</button>
 		<D3Controller
 			{...this.props}
 			is_editing={this.state.is_editing}

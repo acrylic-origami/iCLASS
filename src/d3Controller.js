@@ -43,6 +43,7 @@ export default class extends React.Component {
 			d3.json(`data?dataset=${this.props.dataset}&zoom=${BASEGRAPH_ZOOM}&start_N=0&start_D=1&end_N=1&end_D=1`)
 		], console.log)
 			.then(([{ point_count, Fs, tstart }, data]) => {
+				
 				// TODO account for initial zooms in props
 				
 				// DATA SETUP //
@@ -69,6 +70,9 @@ export default class extends React.Component {
 				const h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(x_ax);
 				const h_y_ax = this.$area.append('g').attr('class', 'axis axis--y').call(y_ax);
 
+				const channel_offset = (y.domain()[1]-y.domain()[0])/(channels.length + 2); // +2 leaves gap at bottom and top
+				const offset = i => (i + 0.5 - channels.length / 2) * channel_offset;
+				
 				const line = d3.line()
 				               .curve(d3.curveMonotoneX)
 				               .x(d => x0(new Date(d[0])))
@@ -77,8 +81,8 @@ export default class extends React.Component {
 				const h_lines =
 					channels.map(ch =>
 						this.$area.append('path')
-				          .data([flat_data.map(packet => [packet[0], packet[1][ch]])])
-				          .attr('class', 'line')
+							.data([flat_data.map(packet => [packet[0], packet[1][ch] / (channels.length + 2) + offset(ch)])])
+				          .attr('class', 'line line-num-'+ch)
 				          .attr('d', line)
 				   );
 				
@@ -115,7 +119,7 @@ export default class extends React.Component {
 								if(did_update) {
 									const data = data_controller.get_data();
 									for(let i = 0; i < channels.length; i++) {
-										h_lines[i].data([data.map(packet => [packet[0], packet[1][channels[i]]])])
+										h_lines[i].data([data.map(packet => [packet[0], packet[1][channels[i]] / (channels.length + 2) + offset(channels[i])])])
 										          .attr('d', line);
 									}
 								}
@@ -133,8 +137,6 @@ export default class extends React.Component {
 				const that = this;
 				
 				function newBrush() {
-					console.log("newBrush()");
-
 					var brush = d3.brushX()
 					    .extent([[0, 0], [x((x.domain())[1]), +that.$svg.attr('height')]])
 					    .on("start", brushstart)
@@ -176,8 +178,6 @@ export default class extends React.Component {
 				    	const extWidth = extent[1][0] - extent[0][0];
 				    	const brushElem = document.getElementById('brush-' + brushId);
 				    	const selection = d3.brushSelection(brushElem);
-				    	
-				    	console.log(selection);
 
 				    	// if a selection exists, store the selected time
 				    	if (selection && selection[0] !== selection[1]) {
@@ -193,8 +193,6 @@ export default class extends React.Component {
 				}
 
 				function updateBrushes() {
-					console.log("updateBrushes()");
-
 					const brushSelection = that.$gBrushes
 					    .selectAll('.brush')
 					    .data(brushes, function (d){return d.id});
@@ -219,8 +217,6 @@ export default class extends React.Component {
 				  	const brushSelection = that.$gBrushes
 					    .selectAll('.brush')
 					    .data(brushes, function (d){return d.id});
-
-					console.log("drawBrushes()");
 
 					// Set up new brushes only
 				  	brushSelection.enter()
