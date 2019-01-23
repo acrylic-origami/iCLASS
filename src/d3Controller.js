@@ -8,7 +8,8 @@ import {debounceTime, bufferCount, map} from 'rxjs/operators';
 import TiledData from './TiledData';
 import {BASEGRAPH_ZOOM, EPS} from './consts';
 
-const channels = [...Array(8).keys()];
+const channels = [...Array(16).keys()];
+const NUM_CH = channels.length;
 
 export default class extends React.Component {
 	constructor(props) {
@@ -18,6 +19,9 @@ export default class extends React.Component {
 		this.zoom = React.createRef();
 		this.area = React.createRef();
 		this.gBrushes = React.createRef();
+		this.zoomFunc = () => {};
+		this.orig_domain = [];
+		this.resampleData = () => {};
 	}
 	
 	componentDidMount() {
@@ -38,6 +42,39 @@ export default class extends React.Component {
 		<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} width={this.props.width} height={this.props.height} ref={this.zoom} />
 	</svg>
 	
+	callZoom = zoom_times => {
+
+		const time_width = this.orig_domain[1].getTime() - this.orig_domain[0].getTime();
+		
+		var new_start = zoom_times[0].getTime();
+		var new_end = zoom_times[1].getTime();
+		var new_width = new_end - new_start;
+		
+		// add a 30% buffer on each side
+		new_start = new_start - new_width*0.30;
+		new_end = new_end + new_width*0.30;
+		new_width = new_end - new_start;
+
+		// if smaller than a 30 second annotation, center in a 30 second window
+		if(new_width <= 30000) {
+			var new_buffer = (30000 - new_width)/2;
+			new_start = new_start - new_buffer;
+			new_end = new_end + new_buffer;
+			new_width = 30000;
+		}
+
+		const start_diff = this.orig_domain[0].getTime() - new_start;
+
+
+		this.$zoom.call(this.zoomFunc.transform, d3.zoomIdentity
+											       .scale(time_width/new_width)
+											       .translate(this.props.width*(start_diff/time_width), 0));
+
+		// resample the data for new resolution
+		const new_domain = [new Date(new_start), new Date(new_end)];
+		this.resampleData(new_domain);
+	}
+
 	onDatasetUpdate = () => Q.all([
 			d3.json(`dataset_meta?dataset=${this.props.dataset}`),
 			d3.json(`data?dataset=${this.props.dataset}&zoom=${BASEGRAPH_ZOOM}&start_N=0&start_D=1&end_N=1&end_D=1`)
@@ -48,6 +85,7 @@ export default class extends React.Component {
 				
 				// DATA SETUP //
 				const domain0 = [new Date(tstart), new Date(tstart + point_count / Fs * 1000)];
+				this.orig_domain = domain0;
 				const data_controller = new TiledData(
 					data.map(chunk => [BASEGRAPH_ZOOM, chunk]),
 					domain0.map(d => d.getTime()),
@@ -70,8 +108,8 @@ export default class extends React.Component {
 				const h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(x_ax);
 				const h_y_ax = this.$area.append('g').attr('class', 'axis axis--y').call(y_ax);
 
-				const channel_offset = (y.domain()[1]-y.domain()[0])/(channels.length + 2); // +2 leaves gap at bottom and top
-				const offset = i => (i + 0.5 - channels.length / 2) * channel_offset;
+				const channel_offset = (y.domain()[1]-y.domain()[0])/(NUM_CH + 2); // +2 leaves gap at bottom and top
+				const offset = i => (i + 0.5 - NUM_CH / 2) * channel_offset;
 				
 				const line = d3.line()
 				               .curve(d3.curveMonotoneX)
@@ -81,32 +119,34 @@ export default class extends React.Component {
 				const h_lines =
 					channels.map(ch =>
 						this.$area.append('path')
-							.data([flat_data.map(packet => [packet[0], packet[1][ch] / (channels.length + 2) + offset(ch)])])
-				          .attr('class', 'line line-num-'+ch)
-				          .attr('d', line)
+							.data([flat_data.map(packet => [packet[0], packet[1][ch] / (NUM_CH + 2) + offset(ch)])])
+				        	.attr('class', 'line line-num-'+ch)
+				        	.attr('d', line)
 				   );
 				
 				const zoom_subj = new Subject();
-				const zoom = d3.zoom()
+				this.zoomFunc = d3.zoom()
 				               .extent([[0, 0], [+this.$svg.attr('width'), +this.$svg.attr('height')]]) // TODO replace with dynamic bbox
 				               .on('zoom', e => {
 				               	// I think 
 				               	// h_line.attr('d', line);
 				               	const tf = d3.event.transform;
-				               	const new_domain = tf.rescaleX(x0).domain();
+				               	// if has_zoomed is false, the new domain should be the one passed by props
+				               	const new_domain =  tf.rescaleX(x0).domain();//this.props.has_zoomed ? t_domain : this.props.zoom_times;
 				               	zoom_subj.next(new_domain);
 				               	x.domain(new_domain);
-
 				               	h_lines.forEach(h_line => {
-				               		const tf_str = `translate(${tf.x} 0) scale(${tf.k} 1)`;
-					               	h_line.attr('transform', tf_str) // assuming non-scaling stroke; much better performance
-					               	this.$gBrushes.attr('transform', tf_str)
+				               		const tf_str = `translate(${tf.x} 0) scale(${tf.k} 1)`;;
+					               	h_line.attr('transform', tf_str); // assuming non-scaling stroke; much better performance
+					               	// this.$gBrushes.attr('transform', tf_str);
+					               	// this.$gBrushes.selectAll('.handle').attr('width', 6/tf.k);
 					               	// h_line.attr('d', line) // without non-scaling stroke, quite wasteful
 				               	}); //Object.assign({}, , { y: 1 }))); // scale only X
 				               	h_x_ax.call(x_ax);
 
-				               	// update brushes
-				               	// updateBrushes();
+				               	// update brushes through x()
+				               	updateBrushes();
+
 				               });
 				zoom_subj.pipe(
 					bufferCount(10),
@@ -118,19 +158,32 @@ export default class extends React.Component {
 							.then(did_update => {
 								if(did_update) {
 									const data = data_controller.get_data();
-									for(let i = 0; i < channels.length; i++) {
-										h_lines[i].data([data.map(packet => [packet[0], packet[1][channels[i]] / (channels.length + 2) + offset(channels[i])])])
-										          .attr('d', line);
+									for(let i = 0; i < NUM_CH; i++) {
+										h_lines[i].data([data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])])
+												  .attr('d', line);
 									}
 								}
 							}, console.log).catch(console.log)
 					});
 
+				// force resampling of data when zoom is done manually
+				this.resampleData = new_domain => {
+					data_controller.update(new_domain)
+						.then(did_update => {
+							if(did_update) {
+								const data = data_controller.get_data();
+								for(let i = 0; i < NUM_CH; i++) {
+									h_lines[i].data([data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])])
+											  .attr('d', line);
+								}
+							}
+						}, console.log).catch(console.log)
+				};
+
+				this.$zoom.call(this.zoomFunc);
+
 				/***** MULTIPLE BRUSHES ******/
 
-				// We initially generate a SVG group to keep our brushes' DOM elements in:
-				this.$zoom.call(zoom);
-				
 				// We also keep the actual d3-brush functions and their IDs in a list:
 				const brushes = [];
 				
@@ -143,18 +196,16 @@ export default class extends React.Component {
 					    .on("brush", brushed)
 					    .on("end", brushend);
 					    
-					that.props.onAddBrush(brush);
+					//that.props.onAddBrush(brush);
 
 					brushes.push({id: brushes.length, brush: brush, times: []});
 
 				  	function brushstart() {
 				    	// your stuff here
-				    	console.log("brushstart()");
 					};
 
 					function brushed() {
 				    	// your stuff here
-				    	console.log("brushed() ");
 					}
 
 					function brushend() {
@@ -165,7 +216,7 @@ export default class extends React.Component {
 
 				    	// If it does, that means we need another one
 				    	if (lastSelection && lastSelection[0] !== lastSelection[1]) {
-			      		newBrush();
+			      			newBrush();
 				    	}
 
 				    	// Always draw brushes
@@ -173,44 +224,35 @@ export default class extends React.Component {
 
 				    	// store/update the value of the selection for the current brush
 				    	const brushId = brushes.findIndex(x => x.brush == brush);
-
-				    	const extent = brush.extent().call();
-				    	const extWidth = extent[1][0] - extent[0][0];
 				    	const brushElem = document.getElementById('brush-' + brushId);
 				    	const selection = d3.brushSelection(brushElem);
 
 				    	// if a selection exists, store the selected time
 				    	if (selection && selection[0] !== selection[1]) {
-					    	const selWidth = selection[1] - selection[0];
-					    	const tRange = x.domain();
-					    	const timeWidth = tRange[1] - tRange[0];
-					    	const selStart = new Date((selection[0]/extWidth)*timeWidth + tRange[0].getTime());
-					    	const selEnd = new Date((selection[1]/extWidth)*timeWidth + tRange[0].getTime());
 					    	// update brushes array with new start and end times
+					    	const selStart = x.invert(selection[0])
+					    	const selEnd = x.invert(selection[1]);
 					    	brushes[brushId].times = [selStart, selEnd];
+					    	// update state
+					    	that.props.onUpdateBrushes(brushes);
 					    }
 					}
 				}
 
 				function updateBrushes() {
-					const brushSelection = that.$gBrushes
-					    .selectAll('.brush')
-					    .data(brushes, function (d){return d.id});
-
 					// moves the brushes to the correct location on the x axis
-					brushSelection.each(function(brushObject) {
-				    	// set some default values of the brushes using the x timescale
+					that.$gBrushes.selectAll('.brush')
+								  .each(function(brushObject) {
+					    	// set some default values of the brushes using the x timescale
+					    	// update the brushes to reflect each selected time
+							if(brushes[brushObject.id].times.length == 2 && brushes[brushObject.id].times !== []) {
+								brushObject.brush.move(d3.select(this), [
+									x(brushes[brushObject.id].times[0]),
+									x(brushes[brushObject.id].times[1])
+								]);
+							}
 
-				    	// update the brushes according to reflect their selected time
-						if(brushes[brushObject.id].times.length == 2 && brushes[brushObject.id].times !== []) {
-							brushObject.brush.move(d3.select(this), [
-								x(brushes[brushObject.id].times[0]),
-								x(brushes[brushObject.id].times[1])
-							]);
-						}
-
-					});
-
+						});
 				}
 
 				function drawBrushes() {
