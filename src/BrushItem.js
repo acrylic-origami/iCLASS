@@ -30,11 +30,11 @@ export default class extends React.Component {
 				<div style={this.brushWrapStyle} key={this.props.seizureId} onClick={() => this.props.onBrushZoom(this.props.seizureId)}>
 					<div style={this.headingStyle}>Seizure {this.props.seizureId}</div>
 					<div>
-						{(new Date(this.props.brush.times[0])).getHours() + ":"
+						{((new Date(this.props.brush.times[0])).getHours()%12) + ":"
 						+ (((new Date(this.props.brush.times[0])).getMinutes() < 10) ? '0' : '') + (new Date(this.props.brush.times[0])).getMinutes() + ":"
 						+ (((new Date(this.props.brush.times[0])).getSeconds() < 10) ? '0' : '') + (new Date(this.props.brush.times[0])).getSeconds()
 						+ " - "
-						+ (new Date(this.props.brush.times[1])).getHours()
+						+ ((new Date(this.props.brush.times[1])).getHours()%12)
 						+ ":" + (((new Date(this.props.brush.times[1])).getMinutes() < 10) ? '0' : '') + (new Date(this.props.brush.times[1])).getMinutes()
 						+ ":" + (((new Date(this.props.brush.times[1])).getSeconds() < 10) ? '0' : '') + (new Date(this.props.brush.times[1])).getSeconds()}
 					</div>

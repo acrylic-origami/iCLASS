@@ -270,14 +270,7 @@ export default class extends React.Component {
 					    	brushObject.brush(d3.select(this));
 					    });
 
-					/* REMOVE POINTER EVENTS ON BRUSH OVERLAYS
-					 *
-					 * This part is abbit tricky and requires knowledge of how brushes are implemented.
-					 * They register pointer events on a .overlay rectangle within them.
-					 * For existing brushes, make sure we disable their pointer events on their overlay.
-					 * This frees the overlay for the most current (as of yet with an empty selection) brush to listen for click and drag events
-					 * The moving and resizing is done with other parts of the brush, so that will still work.
-					 */
+					/* Remove Pointers on Brush Overlays */
 				  	brushSelection
 					    .each(function (brushObject){
 					      d3.select(this)

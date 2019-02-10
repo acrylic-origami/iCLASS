@@ -23,7 +23,8 @@ export default class extends React.Component {
 			left: "0",
 			bottom: "0",
 			width: "308px",
-			borderRight: "1px solid #000"
+			borderRight: "1px solid #000",
+			overflowX: "scroll",
 		};
 
 		this.brushInnerWrapStyle = {
