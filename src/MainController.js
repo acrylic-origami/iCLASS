@@ -1,6 +1,7 @@
 import React from 'react';
 import D3Controller from './d3Controller';
 import BrushItem from './BrushItem';
+import AnnotatePopUp from './AnnotatePopUp';
 
 export default class extends React.Component {
 	constructor(props) {
@@ -10,7 +11,14 @@ export default class extends React.Component {
 			is_editing: false,
 			brushes: [],
 			has_zoomed: true,
-			zoom_times : []
+			zoom_times : [],
+			// For point annotations
+			screenPosY: 0,
+			screenPosX: 0,
+			is_annotating: false,
+			startTime: null,
+			endTime: null
+
 		};
 
 		this.d3WrapStyle = {
@@ -44,7 +52,11 @@ export default class extends React.Component {
 		};
 
 		this.mainStyle = {
-			fontFamily: "'Sarabun', sans-serif"
+			fontFamily: "sans-serif"
+		};
+
+		this.brushListMargin = {
+			paddingBottom: "100px"
 		};
 	}
 	
@@ -77,8 +89,34 @@ export default class extends React.Component {
 		this.d3child.current.callZoom(state_.brushes[i].times);
 	});
 
+	openNewAnnotation = d => this.setState(state_ => {
+		// do position logic
+		return {
+			screenPosY: d.y,
+			screenPosX: d.x,
+			is_annotating: true,
+			annotStart: d.startTime
+		};
+	});
+
+	cancelAnnotation = () => this.setState(state_ => ({
+		screenPosY: 0,
+		screenPosX: 0,
+		is_annotating: false,
+		annotStart: null
+	}));
+
 	
 	render = () => <div style={this.mainStyle}>
+		<AnnotatePopUp
+				startTime={this.state.annotStart}
+				// endTime={this.state.annotEnd}
+				screenPosY={this.state.screenPosY}
+				screenPosX={this.state.screenPosX}
+				is_annotating={this.state.is_annotating}
+				doneAnnotation={this.doneAnnotation}
+				cancelAnnotation={this.cancelAnnotation}
+			/>
 		<div style={this.d3WrapStyle}>
 			<D3Controller
 				{...this.props}
@@ -88,6 +126,7 @@ export default class extends React.Component {
 				onUpdateBrush={this.onEditBrush}
 				onDeleteBrush={this.onDeleteBrush}
 				onUpdateBrushes={this.onUpdateBrushes}
+				openNewAnnotationPopUp={this.openNewAnnotation}
 				width={960}
 				height={640}
 				/>
@@ -99,7 +138,7 @@ export default class extends React.Component {
 						{this.state.is_editing ? 'Zoom/Pan' : 'Annotate'}
 					</button>
 				</div>
-				<div className="brush-list" id="brush-list">
+				<div className="brush-list" style={this.brushListMargin} id="brush-list">
 					{this.state.brushes.map((brush, i) => 
 						<BrushItem
 							key={'brush-item-' + i}

@@ -22,6 +22,7 @@ export default class extends React.Component {
 		this.zoomFunc = () => {};
 		this.orig_domain = [];
 		this.resampleData = () => {};
+		this.x = () => {};
 	}
 	
 	componentDidMount() {
@@ -29,19 +30,31 @@ export default class extends React.Component {
 		this.$area = d3.select(this.area.current);
 		this.$gBrushes = d3.select(this.gBrushes.current);
 		this.$zoom = d3.select(this.zoom.current);
+		this.$zoom.on("dblclick.zoom", null);
+		this.$zoom.on("dblclick", this.openAnnotation);
 		this.onDatasetUpdate();
 	}
+
 	componentDidUpdate(prevProps, prevState) {
 		if(prevProps.dataset !== this.props.dataset) {
 			this.onDatasetUpdate();
 		}
 	}
+
 	render = () => <svg ref={this.svg} width={this.props.width} height={this.props.height}>
 		<g ref={this.area}></g>
 		<g ref={this.gBrushes} className="brushes"></g>
 		<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} width={this.props.width} height={this.props.height} ref={this.zoom} />
 	</svg>
 	
+	openAnnotation = e => { 
+		this.props.openNewAnnotationPopUp({
+			x: d3.event.x,
+			y: d3.event.y,
+			startTime: this.x.invert(d3.event.x - 310)
+		});
+	};
+
 	callZoom = zoom_times => {
 
 		const time_width = this.orig_domain[1].getTime() - this.orig_domain[0].getTime();
@@ -68,7 +81,8 @@ export default class extends React.Component {
 
 		this.$zoom.call(this.zoomFunc.transform, d3.zoomIdentity
 											       .scale(time_width/new_width)
-											       .translate(this.props.width*(start_diff/time_width), 0));
+											       .translate(this.props.width*(start_diff/time_width), 0))
+				  .on("dblclick.zoom", null);
 
 		// resample the data for new resolution
 		const new_domain = [new Date(new_start), new Date(new_end)];
@@ -94,15 +108,15 @@ export default class extends React.Component {
 				const flat_data = data.reduce((acc, chunk) => acc.concat(chunk), []);
 				
 				// UI SETUP //
-				const x = d3.scaleTime()
+				this.x = d3.scaleTime()
 				            .range([0, +this.$svg.attr('width')])
-				            .domain(domain0),
-				      x0 = x.copy(),
-				      y = d3.scaleLinear()
+				            .domain(domain0);
+				const x0 = this.x.copy();
+				const y = d3.scaleLinear()
 				            .range([+this.$svg.attr('height'), 0])
 				            .domain(d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
-				const x_ax = d3.axisBottom(x),
+				const x_ax = d3.axisBottom(this.x),
 				      y_ax = d3.axisLeft(y);
 				               
 				const h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(x_ax);
@@ -134,7 +148,7 @@ export default class extends React.Component {
 				               	// if has_zoomed is false, the new domain should be the one passed by props
 				               	const new_domain =  tf.rescaleX(x0).domain();//this.props.has_zoomed ? t_domain : this.props.zoom_times;
 				               	zoom_subj.next(new_domain);
-				               	x.domain(new_domain);
+				               	this.x.domain(new_domain);
 				               	h_lines.forEach(h_line => {
 				               		const tf_str = `translate(${tf.x} 0) scale(${tf.k} 1)`;;
 					               	h_line.attr('transform', tf_str); // assuming non-scaling stroke; much better performance
@@ -180,7 +194,7 @@ export default class extends React.Component {
 						}, console.log).catch(console.log)
 				};
 
-				this.$zoom.call(this.zoomFunc);
+				this.$zoom.call(this.zoomFunc).on("dblclick.zoom", null);
 
 				/***** MULTIPLE BRUSHES ******/
 
@@ -188,10 +202,10 @@ export default class extends React.Component {
 				const brushes = [];
 				
 				const that = this;
-				
+
 				function newBrush() {
 					var brush = d3.brushX()
-					    .extent([[0, 0], [x((x.domain())[1]), +that.$svg.attr('height')]])
+					    .extent([[0, 0], [that.x((that.x.domain())[1]), +that.$svg.attr('height')]])
 					    .on("start", brushstart)
 					    .on("brush", brushed)
 					    .on("end", brushend);
@@ -199,6 +213,10 @@ export default class extends React.Component {
 					//that.props.onAddBrush(brush);
 
 					brushes.push({id: brushes.length, brush: brush, times: []});
+
+				  	function doubledouble() {
+				  		alert("double click");
+				  	};
 
 				  	function brushstart() {
 				    	// your stuff here
@@ -230,8 +248,8 @@ export default class extends React.Component {
 				    	// if a selection exists, store the selected time
 				    	if (selection && selection[0] !== selection[1]) {
 					    	// update brushes array with new start and end times
-					    	const selStart = x.invert(selection[0])
-					    	const selEnd = x.invert(selection[1]);
+					    	const selStart = that.x.invert(selection[0])
+					    	const selEnd = that.x.invert(selection[1]);
 					    	brushes[brushId].times = [selStart, selEnd];
 					    	// update state
 					    	that.props.onUpdateBrushes(brushes);
@@ -247,8 +265,8 @@ export default class extends React.Component {
 					    	// update the brushes to reflect each selected time
 							if(brushes[brushObject.id].times.length == 2 && brushes[brushObject.id].times !== []) {
 								brushObject.brush.move(d3.select(this), [
-									x(brushes[brushObject.id].times[0]),
-									x(brushes[brushObject.id].times[1])
+									that.x(brushes[brushObject.id].times[0]),
+									that.x(brushes[brushObject.id].times[1])
 								]);
 							}
 
