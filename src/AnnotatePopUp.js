@@ -37,6 +37,9 @@ export default class extends React.Component {
 		}
 	}
 
+	handleFormSubmit = d => {
+		this.props.addAnnotation(d);
+	}
 
 	componentWillUpdate(nextProps, nextState) {
 		if(nextProps.screenPosX !== this.props.screenPosX

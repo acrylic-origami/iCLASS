@@ -17,7 +17,9 @@ export default class extends React.Component {
 			screenPosX: 0,
 			is_annotating: false,
 			startTime: null,
-			endTime: null
+			endTime: null,
+			annotations: [],
+			newAnnotationId: 0
 
 		};
 
@@ -106,15 +108,43 @@ export default class extends React.Component {
 		annotStart: null
 	}));
 
+	addAnnotation = d => {
+		const newAnnotations = this.state.annotations;
+		newAnnotations.push(d);
+		newAnnotations.sort((a, b) => a.startTime - b.startTime);
+		this.setState(state_ => ({
+			annotations: newAnnotations,
+			screenPosY: 0,
+			screenPosX: 0,
+			is_annotating: false,
+			startTime: null,
+			endTime: null,
+			newAnnotationId: state_.newAnnotationId + 1
+		}))
+	};
+
+	typeToString = type => {
+		switch(type) {
+			case("onset"):
+				return "Seizure Onset";
+				break;
+			case("offset"):
+				return "Seizure Offset";
+				break;
+			case("patient"):
+				return "Patient Data";
+				break;
+		}
+	}
+
 	
 	render = () => <div style={this.mainStyle}>
 		<AnnotatePopUp
 				startTime={this.state.annotStart}
-				// endTime={this.state.annotEnd}
 				screenPosY={this.state.screenPosY}
 				screenPosX={this.state.screenPosX}
 				is_annotating={this.state.is_annotating}
-				doneAnnotation={this.doneAnnotation}
+				addAnnotation={this.addAnnotation}
 				cancelAnnotation={this.cancelAnnotation}
 			/>
 		<div style={this.d3WrapStyle}>
@@ -139,6 +169,14 @@ export default class extends React.Component {
 					</button>
 				</div>
 				<div className="brush-list" style={this.brushListMargin} id="brush-list">
+					<div className="annotationList">
+						{this.state.annotations.map((annot, index) =>
+							<div key={"annot-" + index}>
+								<div>{annot.startTimeString + " - " + this.typeToString(annot.type)}</div>
+								<div>{annot.notes}</div>
+							</div>
+						)}
+					</div>
 					{this.state.brushes.map((brush, i) => 
 						<BrushItem
 							key={'brush-item-' + i}

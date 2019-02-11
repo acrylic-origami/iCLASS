@@ -47,8 +47,15 @@ export default class extends React.Component {
 		};
 	}
 
-	handleSubmit = d => {
-		alert(d);
+	onSubmit = d => {
+		// convert string to time
+		const time = d.startTimeString.split(":");
+		const newTime = new Date(this.props.startTime);
+		newTime.setHours(time[0]);
+		newTime.setMinutes(time[1]);
+		newTime.setSeconds(time[2]);
+		newTime.setMilliseconds(time[3]*10);
+		this.props.handleSubmit({...d, startTime: newTime});
 	}
 	
 	mustBeTime = value => (this.isTime(value)  ? "Error: Time must be in the format HH:MM:SS:mSmS (e.g. 23:59:59:99)" : undefined)
@@ -84,10 +91,11 @@ export default class extends React.Component {
 				New Annotation
 			</div>
 			<Form
-      			onSubmit={this.handleSubmit}
-      			initialValues={{ startTime: this.state.startPlaceHolder, type: 'onset' }}
-      			render={({ handleSubmit, form, submitting, pristine, values }) => (
-      				<form onSubmit={handleSubmit} style={this.formStyle}>
+      			onSubmit={this.onSubmit}
+      			initialValues={{ startTimeString: this.state.startPlaceHolder, type: 'onset' }}
+      			render={({ handleSubmit, reset, form, submitting, pristine, values }) => (
+      				<form onSubmit={handleSubmit}
+      						 style={this.formStyle}>
           				<div style={this.sectionStyle}>
             				<div><label>Type</label></div>
             				<Field name="type" component="select">
@@ -96,7 +104,7 @@ export default class extends React.Component {
               					<option value="patient">Patient Event</option>
             				</Field>
           				</div>
-          				<Field name="startTime" validate={this.mustBeTime}>
+          				<Field name="startTimeString" validate={this.mustBeTime}>
             				{({ input, meta }) => (
             					<div style={this.sectionStyle}>
                 					<div><label>Time</label></div>
