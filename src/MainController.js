@@ -70,9 +70,17 @@ export default class extends React.Component {
 		brushes: state_.brushes.concat([brush])
 	}));
 
-	onUpdateBrushes = newBrushes => this.setState(state_ => ({
-		brushes: newBrushes
-	}));
+	onUpdateBrushes = newBrushes => {
+		console.log("onUpdateBrushes");
+		console.log(newBrushes.length);
+		console.log(newBrushes);
+		console.log("---");
+		if(newBrushes.length != 0) {
+			this.setState(state_ => ({
+				brushes: newBrushes
+			}));
+		}
+	};
 	
 	onEditBrush = brush => this.setState(state_ => {
 		const idx = state_.brushes.indexOf(brush);
@@ -112,6 +120,7 @@ export default class extends React.Component {
 		const newAnnotations = this.state.annotations;
 		newAnnotations.push(d);
 		newAnnotations.sort((a, b) => a.startTime - b.startTime);
+		this.annotationsToBrushes(newAnnotations);
 		this.setState(state_ => ({
 			annotations: newAnnotations,
 			screenPosY: 0,
@@ -120,7 +129,69 @@ export default class extends React.Component {
 			startTime: null,
 			endTime: null,
 			newAnnotationId: state_.newAnnotationId + 1
-		}))
+		}));
+	};
+
+	annotationsToBrushes = annots => {
+		// creates an array of brushes combining onsets and offsets where possible
+		console.log("annotationsToBrushes");
+		console.log(annots.length);
+		const newBrushes = [];
+		var lastOnset = null;
+		annots.map((data, index) => {
+			if(lastOnset != null) { // looking for seizure
+				console.log("lastOnset not null");
+				if(data.type == "offset") {
+					// found seizure
+					console.log("found seizure");
+					newBrushes.push({
+										times: [lastOnset, data.startTime], // set brush to have times [last onset, this offset]
+										id: index // this one is debatable I guess
+									});
+					lastOnset = null;
+				} else if (data.type == "onset") {
+					console.log("found new onset");
+					// found new onset
+					newBrushes.push({
+										times: [lastOnset, 
+												new Date(lastOnset).setSeconds(lastOnset.getSeconds() + 2)],
+										id: index
+									});
+					// update lastOnset
+					lastOnset = data.startTime;
+				} else {
+					// found patient data
+					console.log("found patient data");
+					newBrushes.push({
+										times: [data.startTime, 
+												new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
+										id: index
+									});
+				}
+			} else if(data.type == "onset") {
+				console.log("set new onset");
+				// set new onset
+				lastOnset = data.startTime;
+			} else {
+				// add lonely offset or patient data
+				console.log("add lonely offset or patient data");
+				newBrushes.push({
+									times: [data.startTime, 
+											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
+									id: index
+								});
+			}
+			if(index == annots.length - 1) {
+				newBrushes.push({
+									times: [data.startTime, 
+											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
+									id: index
+								});
+			}
+		});
+		this.setState(state_ => ({
+			brushes: newBrushes
+		}));
 	};
 
 	typeToString = type => {
@@ -156,6 +227,7 @@ export default class extends React.Component {
 				onUpdateBrush={this.onEditBrush}
 				onDeleteBrush={this.onDeleteBrush}
 				onUpdateBrushes={this.onUpdateBrushes}
+				brushes={this.state.brushes}
 				openNewAnnotationPopUp={this.openNewAnnotation}
 				width={960}
 				height={640}

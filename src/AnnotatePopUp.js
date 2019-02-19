@@ -29,10 +29,10 @@ export default class extends React.Component {
 		this.annotationBarStyle = {
 			position: "absolute",
 			zIndex: "998",
-			height: "630px",
+			height: "640px",
 			width: "2px",
 			backgroundColor: "#178ccb",
-			top: "20px",
+			top: "9px",
 			left: "0px"
 		}
 	}
@@ -47,11 +47,11 @@ export default class extends React.Component {
 			this.menuStyle = {
 				...this.menuStyle,
 				top: nextProps.screenPosY + "px",
-				left: nextProps.screenPosX + "px"
+				left: (nextProps.screenPosX + 4) + "px"
 			};
 			this.annotationBarStyle = {
 				...this.annotationBarStyle,
-				left: (nextProps.screenPosX - 3) + "px"
+				left: (nextProps.screenPosX ) + "px"
 			};
 		}
 	}

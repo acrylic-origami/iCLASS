@@ -23,6 +23,10 @@ export default class extends React.Component {
 		this.orig_domain = [];
 		this.resampleData = () => {};
 		this.x = () => {};
+		this.drawBrushes = () => {};
+		this.newBrush = () => {};
+		this.updateBrushes = () => {};
+		this.clearBrushes = () => {};
 	}
 	
 	componentDidMount() {
@@ -36,9 +40,17 @@ export default class extends React.Component {
 	}
 
 	componentDidUpdate(prevProps, prevState) {
+		console.log("did update");
 		if(prevProps.dataset !== this.props.dataset) {
 			this.onDatasetUpdate();
 		}
+		if(prevProps.brushes !== this.props.brushes) {
+			this.clearBrushes();
+			for(var i = 0; i < this.props.brushes.length; i++) {
+				this.newBrush(this.props.brushes[i].times);
+			}
+		}
+		this.drawBrushes();
 	}
 
 	render = () => <svg ref={this.svg} width={this.props.width} height={this.props.height}>
@@ -159,7 +171,7 @@ export default class extends React.Component {
 				               	h_x_ax.call(x_ax);
 
 				               	// update brushes through x()
-				               	updateBrushes();
+				               	this.updateBrushes();
 
 				               });
 				zoom_subj.pipe(
@@ -203,7 +215,9 @@ export default class extends React.Component {
 				
 				const that = this;
 
-				function newBrush() {
+				this.newBrush = (times) => {
+					console.log("first call");
+					console.log(times);
 					var brush = d3.brushX()
 					    .extent([[0, 0], [that.x((that.x.domain())[1]), +that.$svg.attr('height')]])
 					    .on("start", brushstart)
@@ -211,8 +225,11 @@ export default class extends React.Component {
 					    .on("end", brushend);
 					    
 					//that.props.onAddBrush(brush);
-
-					brushes.push({id: brushes.length, brush: brush, times: []});
+					if (Array.isArray(times) && times.length == 2) {
+						brushes.push({id: brushes.length, brush: brush, times: times});
+					} else {
+						brushes.push({id: brushes.length, brush: brush, times: []});
+					}
 
 				  	function doubledouble() {
 				  		alert("double click");
@@ -227,6 +244,7 @@ export default class extends React.Component {
 					}
 
 					function brushend() {
+				    	console.log("brushEnd");
 				    	// Figure out if our latest brush has a selection
 				    	const lastBrushID = brushes[brushes.length - 1].id;
 				    	const lastBrush = document.getElementById('brush-' + lastBrushID);
@@ -234,11 +252,11 @@ export default class extends React.Component {
 
 				    	// If it does, that means we need another one
 				    	if (lastSelection && lastSelection[0] !== lastSelection[1]) {
-			      			newBrush();
+			      			that.newBrush(null);
 				    	}
 
 				    	// Always draw brushes
-				    	drawBrushes();
+				    	//that.drawBrushes();
 
 				    	// store/update the value of the selection for the current brush
 				    	const brushId = brushes.findIndex(x => x.brush == brush);
@@ -252,12 +270,13 @@ export default class extends React.Component {
 					    	const selEnd = that.x.invert(selection[1]);
 					    	brushes[brushId].times = [selStart, selEnd];
 					    	// update state
-					    	that.props.onUpdateBrushes(brushes);
+					    	//that.props.onUpdateBrushes(brushes);
 					    }
 					}
 				}
 
-				function updateBrushes() {
+				this.updateBrushes = () => {
+					console.log("update brushes");
 					// moves the brushes to the correct location on the x axis
 					that.$gBrushes.selectAll('.brush')
 								  .each(function(brushObject) {
@@ -273,7 +292,8 @@ export default class extends React.Component {
 						});
 				}
 
-				function drawBrushes() {
+				this.drawBrushes = () => {
+				  	console.log("draw brushes");
 				  	const brushSelection = that.$gBrushes
 					    .selectAll('.brush')
 					    .data(brushes, function (d){return d.id});
@@ -296,7 +316,7 @@ export default class extends React.Component {
 					        .style('pointer-events', function() {
 					          var brush = brushObject.brush;
 					          if (brushObject.id === brushes.length-1 && brush !== undefined) {
-					            return 'all';
+					            return 'none';
 					          } else {
 					            return 'none';
 					          }
@@ -306,9 +326,20 @@ export default class extends React.Component {
 					// remove brushes that no longer exist on the selection
 				  	brushSelection.exit()
 				    	.remove();
+
+				   	this.updateBrushes();
 				}
 
-				newBrush();
-				drawBrushes();
+				this.clearBrushes = () => {
+					const brushSelection = that.$gBrushes
+					    .selectAll('.brush')
+					    .data(brushes, function (d){return d.id});
+
+					brushes.length = 0;
+					this.drawBrushes();
+				};
+
+				this.newBrush();
+				this.drawBrushes();
 			}, console.log).catch(console.log);
 }

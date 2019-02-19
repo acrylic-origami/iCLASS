@@ -24,6 +24,11 @@ export default class extends React.Component {
 	// 	is_editing: !state_.is_editing
 	// }));
 	
+	componentDidUpdate(prevProps, prevState) {
+		console.log("did update:");
+		console.log(prevProps.brush);
+	}
+
 	render = () =>
 		<div>
 			{(typeof this.props.brush.times[0] == "object") ? 
