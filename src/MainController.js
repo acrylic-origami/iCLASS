@@ -9,7 +9,6 @@ export default class extends React.Component {
 		this.d3child = React.createRef();
 		this.state = {
 			is_editing: false,
-			brushes: [],
 			has_zoomed: true,
 			zoom_times : [],
 			// For point annotations
@@ -19,7 +18,8 @@ export default class extends React.Component {
 			startTime: null,
 			endTime: null,
 			annotations: [],
-			newAnnotationId: 0
+			newAnnotationId: 0,
+			brushes: []
 
 		};
 
@@ -65,40 +65,13 @@ export default class extends React.Component {
 	onEditZoomToggle = () => this.setState(state_ => ({
 		is_editing: !state_.is_editing
 	}));
-	
-	onAddBrush = brush => this.setState(state_ => ({
-		brushes: state_.brushes.concat([brush])
-	}));
 
-	onUpdateBrushes = newBrushes => {
-		console.log("onUpdateBrushes");
-		console.log(newBrushes.length);
-		console.log(newBrushes);
-		console.log("---");
-		if(newBrushes.length != 0) {
-			this.setState(state_ => ({
-				brushes: newBrushes
-			}));
-		}
-	};
-	
-	onEditBrush = brush => this.setState(state_ => {
-		const idx = state_.brushes.indexOf(brush);
-		if(idx !== -1) {
-			// TODO server calls here
-			onEditBrush();
-		}
-	});
-
-	onDeleteBrush = i => this.setState(state_ => {
-		state_.brushes.splice(i, 1);
-		return { 'brushes': state_.brushes };
-	});
-
+	// Should zoom to brush
 	onBrushZoom = i => this.setState(state_ => {
 		this.d3child.current.callZoom(state_.brushes[i].times);
 	});
 
+	// Opens new annotation pop up window
 	openNewAnnotation = d => this.setState(state_ => {
 		// do position logic
 		return {
@@ -109,6 +82,7 @@ export default class extends React.Component {
 		};
 	});
 
+	// Closes new annotation pop up window
 	cancelAnnotation = () => this.setState(state_ => ({
 		screenPosY: 0,
 		screenPosX: 0,
@@ -116,6 +90,8 @@ export default class extends React.Component {
 		annotStart: null
 	}));
 
+	// Saves results from new annotation form
+	// AND updates brushes
 	addAnnotation = d => {
 		const newAnnotations = this.state.annotations;
 		newAnnotations.push(d);
@@ -132,68 +108,88 @@ export default class extends React.Component {
 		}));
 	};
 
+	// Updates the start times of annotations that were edited via the brushes
+	onUpdateAnnotation = d => {
+		const newAnnotations = this.state.annotations;
+		d.map((data, index) => {
+			newAnnotations[data.id].startTime = data.time;
+		});
+		this.setState(state_ => ({
+			annotations: newAnnotations
+		}));
+	};
+
+	// Converts annotations to brushes, ie checks for onset/offset pairs
 	annotationsToBrushes = annots => {
 		// creates an array of brushes combining onsets and offsets where possible
-		console.log("annotationsToBrushes");
-		console.log(annots.length);
 		const newBrushes = [];
-		var lastOnset = null;
+		var lastOnsetTime = null;
+		var lastOnsetId = null;
 		annots.map((data, index) => {
-			if(lastOnset != null) { // looking for seizure
-				console.log("lastOnset not null");
+			if(lastOnsetTime != null) { // looking for seizure
 				if(data.type == "offset") {
 					// found seizure
-					console.log("found seizure");
 					newBrushes.push({
-										times: [lastOnset, data.startTime], // set brush to have times [last onset, this offset]
-										id: index // this one is debatable I guess
+										type: "range",
+										times: [lastOnsetTime, data.startTime], // set brush to have times [last onset, this offset]
+										ids: [lastOnsetId, index], // this one is debatable I guess
+										titles: ["Seizure Onset", "Seizure Offset"]
 									});
-					lastOnset = null;
+					lastOnsetTime = null;
 				} else if (data.type == "onset") {
-					console.log("found new onset");
 					// found new onset
 					newBrushes.push({
-										times: [lastOnset, 
-												new Date(lastOnset).setSeconds(lastOnset.getSeconds() + 2)],
-										id: index
+										type: "point",
+										times: [lastOnsetTime, 
+												new Date(lastOnsetTime).setSeconds(lastOnsetTime.getSeconds() + 2)],
+										ids: [lastOnsetId],
+										titles: ["Seizure Onset", ""]
 									});
-					// update lastOnset
-					lastOnset = data.startTime;
+					// update lastOnsetTime
+					lastOnsetTime = data.startTime;
+					lastOnsetId = index;
 				} else {
 					// found patient data
-					console.log("found patient data");
 					newBrushes.push({
+										type: "point",
 										times: [data.startTime, 
 												new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-										id: index
+										ids: [index],
+										titles: ["Patient Event", ""]
 									});
 				}
 			} else if(data.type == "onset") {
-				console.log("set new onset");
 				// set new onset
-				lastOnset = data.startTime;
+				lastOnsetTime = data.startTime;
+				lastOnsetId = index;
 			} else {
 				// add lonely offset or patient data
-				console.log("add lonely offset or patient data");
 				newBrushes.push({
+									type: "point",
 									times: [data.startTime, 
 											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-									id: index
+									ids: [index],
+									titles: [(data.type == "offset") ? "Seizure Offset" : "Patient Event", ""]
 								});
 			}
-			if(index == annots.length - 1) {
+			if(index == annots.length - 1 && lastOnsetTime != null) {
+				// add lonely onset
 				newBrushes.push({
+									type: "point",
 									times: [data.startTime, 
 											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-									id: index
+									ids: [index],
+									titles: ["Seizure Onset", ""]
 								});
 			}
 		});
+		// update brushes state, which will affect d3 controller
 		this.setState(state_ => ({
 			brushes: newBrushes
 		}));
 	};
 
+	// convert the type of annotation to a string title
 	typeToString = type => {
 		switch(type) {
 			case("onset"):
@@ -203,10 +199,17 @@ export default class extends React.Component {
 				return "Seizure Offset";
 				break;
 			case("patient"):
-				return "Patient Data";
+				return "Patient Event";
 				break;
 		}
-	}
+	};
+
+	timeToString = time => {
+		return ((new Date(time)).getHours()%12) + ":"
+						+ (((new Date(time)).getMinutes() < 10) ? '0' : '') + (new Date(time)).getMinutes() + ":"
+						+ (((new Date(time)).getSeconds() < 10) ? '0' : '') + (new Date(time)).getSeconds() + ":"
+						+ (((new Date(time)).getMilliseconds() < 10) ? '0' : '') + ((new Date(time)).getMilliseconds()/10 - ((new Date(time)).getMilliseconds()%10)/10);
+	};
 
 	
 	render = () => <div style={this.mainStyle}>
@@ -223,10 +226,7 @@ export default class extends React.Component {
 				{...this.props}
 				ref={this.d3child}
 				is_editing={this.state.is_editing}
-				onAddBrush={this.onAddBrush}
-				onUpdateBrush={this.onEditBrush}
-				onDeleteBrush={this.onDeleteBrush}
-				onUpdateBrushes={this.onUpdateBrushes}
+				updateAnnotation={this.onUpdateAnnotation}
 				brushes={this.state.brushes}
 				openNewAnnotationPopUp={this.openNewAnnotation}
 				width={960}
@@ -244,7 +244,9 @@ export default class extends React.Component {
 					<div className="annotationList">
 						{this.state.annotations.map((annot, index) =>
 							<div key={"annot-" + index}>
-								<div>{annot.startTimeString + " - " + this.typeToString(annot.type)}</div>
+								<div>{
+										this.timeToString(annot.startTime) + " - "
+										+ this.typeToString(annot.type)}</div>
 								<div>{annot.notes}</div>
 							</div>
 						)}

@@ -23,10 +23,10 @@ export default class extends React.Component {
 		this.orig_domain = [];
 		this.resampleData = () => {};
 		this.x = () => {};
-		this.drawBrushes = () => {};
 		this.newBrush = () => {};
 		this.updateBrushes = () => {};
 		this.clearBrushes = () => {};
+		this.brushes = [];
 	}
 	
 	componentDidMount() {
@@ -40,17 +40,18 @@ export default class extends React.Component {
 	}
 
 	componentDidUpdate(prevProps, prevState) {
-		console.log("did update");
 		if(prevProps.dataset !== this.props.dataset) {
 			this.onDatasetUpdate();
 		}
+		
+		// When the brush list is updated from the props,
+		// Clear the brushes and add new ones
 		if(prevProps.brushes !== this.props.brushes) {
 			this.clearBrushes();
 			for(var i = 0; i < this.props.brushes.length; i++) {
-				this.newBrush(this.props.brushes[i].times);
+				this.newBrush(this.props.brushes[i]);
 			}
 		}
-		this.drawBrushes();
 	}
 
 	render = () => <svg ref={this.svg} width={this.props.width} height={this.props.height}>
@@ -208,32 +209,51 @@ export default class extends React.Component {
 
 				this.$zoom.call(this.zoomFunc).on("dblclick.zoom", null);
 
-				/***** MULTIPLE BRUSHES ******/
-
-				// We also keep the actual d3-brush functions and their IDs in a list:
-				const brushes = [];
+				/***** BRUSHES ******/			
 				
 				const that = this;
 
-				this.newBrush = (times) => {
-					console.log("first call");
-					console.log(times);
+				this.newBrush = (data) => {
+
 					var brush = d3.brushX()
 					    .extent([[0, 0], [that.x((that.x.domain())[1]), +that.$svg.attr('height')]])
 					    .on("start", brushstart)
 					    .on("brush", brushed)
 					    .on("end", brushend);
-					    
-					//that.props.onAddBrush(brush);
-					if (Array.isArray(times) && times.length == 2) {
-						brushes.push({id: brushes.length, brush: brush, times: times});
-					} else {
-						brushes.push({id: brushes.length, brush: brush, times: []});
+
+					this.brushes.push(brush);
+
+					const gBrush = that.$gBrushes
+									   .insert("g", '.brush')
+					    			   .attr("class", "brush")
+					    			   .attr('id', "brush-" + data.ids[0])
+					    			   .call(brush)
+					    			   .call(brush.move, data.times.map(that.x));
+
+					// If point, add brush, delete handles, add title (after)
+					// If range, add brush, add custom handles with titles
+					if(data.type == "point") {
+						gBrush.attr("class", "brush point");
+
+						// Move the brush to the startTime + a fixed width
+						gBrush.call(brush.move, [that.x(data.times[0]), that.x(data.times[0]) + 2]);
+
+						// Remove the handles so can't be resized
+						gBrush.selectAll('.brush>.handle').remove();
+
+						// add titles
+					
+					} else if (data.type == "range") {
+						gBrush.attr("class", "brush range");
+
+						// Move the brush to the startTime and endTime
+						gBrush.call(brush.move, data.times.map(that.x));
+						
+						// add titles as custom handles
 					}
 
-				  	function doubledouble() {
-				  		alert("double click");
-				  	};
+					// remove all brush overlays
+					d3.selectAll('.brush>.overlay').remove();
 
 				  	function brushstart() {
 				    	// your stuff here
@@ -244,102 +264,54 @@ export default class extends React.Component {
 					}
 
 					function brushend() {
-				    	console.log("brushEnd");
-				    	// Figure out if our latest brush has a selection
-				    	const lastBrushID = brushes[brushes.length - 1].id;
-				    	const lastBrush = document.getElementById('brush-' + lastBrushID);
-				    	const lastSelection = d3.brushSelection(lastBrush);
-
-				    	// If it does, that means we need another one
-				    	if (lastSelection && lastSelection[0] !== lastSelection[1]) {
-			      			that.newBrush(null);
-				    	}
-
-				    	// Always draw brushes
-				    	//that.drawBrushes();
-
-				    	// store/update the value of the selection for the current brush
-				    	const brushId = brushes.findIndex(x => x.brush == brush);
-				    	const brushElem = document.getElementById('brush-' + brushId);
+				    	// store/update the value of the new brush selection
+				    	const brushElem = document.getElementById('brush-' + data.ids[0]);
 				    	const selection = d3.brushSelection(brushElem);
 
 				    	// if a selection exists, store the selected time
 				    	if (selection && selection[0] !== selection[1]) {
-					    	// update brushes array with new start and end times
+					    	// update that.brushes array with new start and end times
 					    	const selStart = that.x.invert(selection[0])
 					    	const selEnd = that.x.invert(selection[1]);
-					    	brushes[brushId].times = [selStart, selEnd];
-					    	// update state
-					    	//that.props.onUpdateBrushes(brushes);
+					    	
+					    	if (data.type == "point") {
+					    		that.props.updateAnnotation([{id: data.ids[0], time: new Date(selStart)}]);
+					    	} else { // range
+								that.props.updateAnnotation([
+									{id: data.ids[0], time: new Date(selStart)},
+									{id: data.ids[1], time: new Date(selEnd)}
+								]);
+					    	}
 					    }
 					}
 				}
 
 				this.updateBrushes = () => {
-					console.log("update brushes");
-					// moves the brushes to the correct location on the x axis
+					// manually moves each brush to the correct location on the x axis
 					that.$gBrushes.selectAll('.brush')
-								  .each(function(brushObject) {
-					    	// set some default values of the brushes using the x timescale
-					    	// update the brushes to reflect each selected time
-							if(brushes[brushObject.id].times.length == 2 && brushes[brushObject.id].times !== []) {
-								brushObject.brush.move(d3.select(this), [
-									that.x(brushes[brushObject.id].times[0]),
-									that.x(brushes[brushObject.id].times[1])
-								]);
-							}
+								  .each((brushObject, index) => {
 
-						});
-				}
+								const brush_data = that.props.brushes[index];
 
-				this.drawBrushes = () => {
-				  	console.log("draw brushes");
-				  	const brushSelection = that.$gBrushes
-					    .selectAll('.brush')
-					    .data(brushes, function (d){return d.id});
+								const brushElem = d3.select(document.getElementById('brush-' + brush_data.ids[0]));
 
-					// Set up new brushes only
-				  	brushSelection.enter()
-					    .insert("g", '.brush')
-					    .attr('class', 'brush')
-					    .attr('id', function(brush){ return "brush-" + brush.id; })
-					    .each(function(brushObject) {
-					    	//call the brush
-					    	brushObject.brush(d3.select(this));
-					    });
+								if(brush_data.type == "point") {
+									brushElem.call(this.brushes[index].move,
+															[that.x(brush_data.times[0]), that.x(brush_data.times[0]) + 2]);
+								} else {
+									brushElem.call(this.brushes[index].move, brush_data.times.map(that.x));
+								}
 
-					/* Remove Pointers on Brush Overlays */
-				  	brushSelection
-					    .each(function (brushObject){
-					      d3.select(this)
- 					        .selectAll('.overlay')
-					        .style('pointer-events', function() {
-					          var brush = brushObject.brush;
-					          if (brushObject.id === brushes.length-1 && brush !== undefined) {
-					            return 'none';
-					          } else {
-					            return 'none';
-					          }
-					        });
-					    });
-
-					// remove brushes that no longer exist on the selection
-				  	brushSelection.exit()
-				    	.remove();
-
-				   	this.updateBrushes();
+					});
 				}
 
 				this.clearBrushes = () => {
+					that.brushes.length = 0;
+
 					const brushSelection = that.$gBrushes
 					    .selectAll('.brush')
-					    .data(brushes, function (d){return d.id});
-
-					brushes.length = 0;
-					this.drawBrushes();
+					    .remove();
 				};
 
-				this.newBrush();
-				this.drawBrushes();
 			}, console.log).catch(console.log);
 }

@@ -25,8 +25,8 @@ export default class extends React.Component {
 	// }));
 	
 	componentDidUpdate(prevProps, prevState) {
-		console.log("did update:");
-		console.log(prevProps.brush);
+		// console.log("did update:");
+		// console.log(prevProps.brush);
 	}
 
 	render = () =>
