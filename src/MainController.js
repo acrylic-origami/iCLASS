@@ -1,6 +1,5 @@
 import React from 'react';
 import D3Controller from './d3Controller';
-import BrushItem from './BrushItem';
 import AnnotatePopUp from './AnnotatePopUp';
 import Annotation from './Annotation';
 
@@ -15,6 +14,10 @@ export default class extends React.Component {
 			// For point annotations
 			screenPosY: 0,
 			screenPosX: 0,
+			type: "", 
+			notes: "",
+			annot_id: 0,
+			is_new: false,
 			is_annotating: false,
 			startTime: null,
 			endTime: null,
@@ -79,7 +82,10 @@ export default class extends React.Component {
 			screenPosY: d.y,
 			screenPosX: d.x,
 			is_annotating: true,
-			annotStart: d.startTime
+			annotStart: d.startTime,
+			type: d.type, 
+			notes: d.notes,
+			annot_id: d.annot_id
 		};
 	});
 
@@ -88,14 +94,24 @@ export default class extends React.Component {
 		screenPosY: 0,
 		screenPosX: 0,
 		is_annotating: false,
-		annotStart: null
+		annotStart: null,
+		type: undefined, 
+		notes: undefined,
+		annot_id: undefined
 	}));
 
 	// Saves results from new annotation form
 	// AND updates brushes
 	addAnnotation = d => {
 		const newAnnotations = this.state.annotations;
-		newAnnotations.push(d);
+		if(d.is_new) {
+			newAnnotations.push({startTime: d.startTime, type: d.type, notes: d.notes});
+		} else {
+			newAnnotations[d.annot_id].startTime = d.startTime;
+			newAnnotations[d.annot_id].type = d.type;
+			newAnnotations[d.annot_id].notes = d.notes;
+		}
+		
 		newAnnotations.sort((a, b) => a.startTime - b.startTime);
 		this.annotationsToBrushes(newAnnotations);
 		this.setState(state_ => ({
@@ -196,6 +212,9 @@ export default class extends React.Component {
 				startTime={this.state.annotStart}
 				screenPosY={this.state.screenPosY}
 				screenPosX={this.state.screenPosX}
+				type={this.state.type}
+				notes={this.state.notes}
+				annot_id={this.state.annot_id}
 				is_annotating={this.state.is_annotating}
 				addAnnotation={this.addAnnotation}
 				cancelAnnotation={this.cancelAnnotation}
@@ -227,6 +246,8 @@ export default class extends React.Component {
 								time={annot.startTime}
 								type={annot.type}
 								notes={annot.notes}
+								annot_id={index}
+								openNewAnnotationPopUp={this.openNewAnnotation}
 							/>
 						)}
 					</div>

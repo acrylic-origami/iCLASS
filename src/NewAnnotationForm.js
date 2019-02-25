@@ -6,7 +6,8 @@ export default class extends React.Component {
 		super(props); // props: initial: [dataset, [start, range]]
 
 		this.state = {
-			startPlaceholder: ""
+			startPlaceholder: "",
+			is_new: false,
 		};
 
 		this.titleStyle = {
@@ -55,7 +56,7 @@ export default class extends React.Component {
 		newTime.setMinutes(time[1]);
 		newTime.setSeconds(time[2]);
 		newTime.setMilliseconds(time[3]*10);
-		this.props.handleSubmit({...d, startTime: newTime});
+		this.props.handleSubmit({...d, startTime: newTime, is_new: this.state.is_new, annot_id: this.props.annot_id});
 	}
 	
 	mustBeTime = value => (this.isTime(value)  ? "Error: Time must be in the format HH:MM:SS:mSmS (e.g. 23:59:59:99)" : undefined)
@@ -81,18 +82,19 @@ export default class extends React.Component {
 			startPlaceHolder: ((start.getHours() < 10) ? "0" : "") + start.getHours() + ":"
 							  + ((start.getMinutes() < 10) ? "0" : "") + start.getMinutes() + ":"
 							  + ((start.getSeconds() < 10) ? "0" : "") + start.getSeconds() + ":"
-							  + (((start.getMilliseconds() / 10) < 10) ? "0" : "") + (start.getMilliseconds() / 10)
+							  + (((start.getMilliseconds() / 10) < 10) ? "0" : "") + (start.getMilliseconds() / 10),
+			is_new: (this.props.type == undefined)
 		}));
   	}
 
 	render = () =>
 		<div>
 			<div style={this.titleStyle}>
-				New Annotation
+				{(this.props.type == undefined) ? 'New' : 'Edit'} Annotation
 			</div>
 			<Form
       			onSubmit={this.onSubmit}
-      			initialValues={{ startTimeString: this.state.startPlaceHolder, type: 'onset' }}
+      			initialValues={{ startTimeString: this.state.startPlaceHolder, type: (this.props.type == undefined) ? 'onset' : this.props.type, notes: (this.props.notes == undefined) ? '' : this.props.notes}}
       			render={({ handleSubmit, reset, form, submitting, pristine, values }) => (
       				<form onSubmit={handleSubmit}
       						 style={this.formStyle}>

@@ -64,8 +64,11 @@ export default class extends React.Component {
 					<div className="annotation-menu" style={this.menuStyle}>
 						<NewAnnotationForm 
 							startTime={this.props.startTime}
+							type={this.props.type}
+							notes={this.props.notes}
 							handleSubmit={this.handleFormSubmit}
 							handleCancel={this.props.cancelAnnotation}
+							annot_id={this.props.annot_id}
 						/>
 					</div>
 					<div className="annotation-overlay" style={this.overlayStyle} onClick={this.props.cancelAnnotation}></div>

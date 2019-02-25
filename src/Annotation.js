@@ -55,9 +55,20 @@ export default class extends React.Component {
 						+ (((new Date(time)).getMilliseconds() < 10) ? '0' : '') + ((new Date(time)).getMilliseconds()/10 - ((new Date(time)).getMilliseconds()%10)/10);
 	};
 
+	openAnnotation = e => { 
+		this.props.openNewAnnotationPopUp({
+			x: 308,
+			y: e.screenY - 150,
+			startTime: this.props.time,
+			type: this.props.type,
+			notes: this.props.notes,
+			annot_id: this.props.annot_id
+		});
+	};
+
 	render = () =>
 		<div>
-			<div style={this.annotWrapStyle}>
+			<div style={this.annotWrapStyle} onDoubleClick={this.openAnnotation.bind(this)}>
 				<div style={this.titleStyle}>
 					{this.typeToString(this.props.type)}
 				</div>

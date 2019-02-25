@@ -35,7 +35,7 @@ export default class extends React.Component {
 		this.$gBrushes = d3.select(this.gBrushes.current);
 		this.$zoom = d3.select(this.zoom.current);
 		this.$zoom.on("dblclick.zoom", null);
-		this.$zoom.on("dblclick", this.openAnnotation);
+		this.$svg.on("dblclick", this.openAnnotation);
 		this.onDatasetUpdate();
 	}
 
