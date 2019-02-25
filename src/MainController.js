@@ -2,6 +2,7 @@ import React from 'react';
 import D3Controller from './d3Controller';
 import BrushItem from './BrushItem';
 import AnnotatePopUp from './AnnotatePopUp';
+import Annotation from './Annotation';
 
 export default class extends React.Component {
 	constructor(props) {
@@ -189,28 +190,6 @@ export default class extends React.Component {
 		}));
 	};
 
-	// convert the type of annotation to a string title
-	typeToString = type => {
-		switch(type) {
-			case("onset"):
-				return "Seizure Onset";
-				break;
-			case("offset"):
-				return "Seizure Offset";
-				break;
-			case("patient"):
-				return "Patient Event";
-				break;
-		}
-	};
-
-	timeToString = time => {
-		return ((new Date(time)).getHours()%12) + ":"
-						+ (((new Date(time)).getMinutes() < 10) ? '0' : '') + (new Date(time)).getMinutes() + ":"
-						+ (((new Date(time)).getSeconds() < 10) ? '0' : '') + (new Date(time)).getSeconds() + ":"
-						+ (((new Date(time)).getMilliseconds() < 10) ? '0' : '') + ((new Date(time)).getMilliseconds()/10 - ((new Date(time)).getMilliseconds()%10)/10);
-	};
-
 	
 	render = () => <div style={this.mainStyle}>
 		<AnnotatePopUp
@@ -243,22 +222,14 @@ export default class extends React.Component {
 				<div className="brush-list" style={this.brushListMargin} id="brush-list">
 					<div className="annotationList">
 						{this.state.annotations.map((annot, index) =>
-							<div key={"annot-" + index}>
-								<div>{
-										this.timeToString(annot.startTime) + " - "
-										+ this.typeToString(annot.type)}</div>
-								<div>{annot.notes}</div>
-							</div>
+							<Annotation
+								key={"annot-" + index}
+								time={annot.startTime}
+								type={annot.type}
+								notes={annot.notes}
+							/>
 						)}
 					</div>
-					{this.state.brushes.map((brush, i) => 
-						<BrushItem
-							key={'brush-item-' + i}
-							seizureId={i}
-							brush={brush}
-							onBrushZoom={this.onBrushZoom}
-						/>
-					)}
 				</div>
 			</div>
 		</div>
