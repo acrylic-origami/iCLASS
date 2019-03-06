@@ -5,7 +5,8 @@ import Frac from 'fraction.js';
 import {fromEvent, Subject} from 'rxjs';
 import {debounceTime, bufferCount, map} from 'rxjs/operators';
 
-import TiledData from './TiledData';
+// import DataController from './DataController';
+import DataController from './FlatData';
 import {BASEGRAPH_ZOOM, EPS} from './consts';
 
 const channels = [...Array(16).keys()];
@@ -19,6 +20,8 @@ export default class extends React.Component {
 		this.zoom = React.createRef();
 		this.area = React.createRef();
 		this.gBrushes = React.createRef();
+		
+		
 		this.zoomFunc = () => {};
 		this.orig_domain = [];
 		this.resampleData = () => {};
@@ -34,6 +37,7 @@ export default class extends React.Component {
 		this.$area = d3.select(this.area.current);
 		this.$gBrushes = d3.select(this.gBrushes.current);
 		this.$zoom = d3.select(this.zoom.current);
+		
 		this.$zoom.on("dblclick.zoom", null);
 		this.$svg.on("dblclick", this.openAnnotation);
 		this.onDatasetUpdate();
@@ -95,7 +99,7 @@ export default class extends React.Component {
 		this.$zoom.call(this.zoomFunc.transform, d3.zoomIdentity
 											       .scale(time_width/new_width)
 											       .translate(this.props.width*(start_diff/time_width), 0))
-				  .on("dblclick.zoom", null);
+				  // .on("dblclick.zoom", null);
 
 		// resample the data for new resolution
 		const new_domain = [new Date(new_start), new Date(new_end)];
@@ -112,18 +116,18 @@ export default class extends React.Component {
 				
 				// DATA SETUP //
 				const domain0 = [new Date(tstart), new Date(tstart + point_count / Fs * 1000)];
+				const domain1 = [new Date(tstart), new Date(tstart + 30E3)]; // TODO clean this
 				this.orig_domain = domain0;
-				const data_controller = new TiledData(
-					data.map(chunk => [BASEGRAPH_ZOOM, chunk]),
-					domain0.map(d => d.getTime()),
-					(zoom, start, end) => d3.json(`data?dataset=${this.props.dataset}&zoom=${zoom}&start_N=${start.n}&start_D=${start.d}&end_N=${end.n}&end_D=${end.d}`)
+				const data_controller = new DataController(
+					this.props.dataset,
+					domain0.map(d => d.getTime())
 				);
 				const flat_data = data.reduce((acc, chunk) => acc.concat(chunk), []);
 				
 				// UI SETUP //
 				this.x = d3.scaleTime()
 				            .range([0, +this.$svg.attr('width')])
-				            .domain(domain0);
+				            .domain(domain1);
 				const x0 = this.x.copy();
 				const y = d3.scaleLinear()
 				            .range([+this.$svg.attr('height'), 0])
@@ -152,8 +156,9 @@ export default class extends React.Component {
 				   );
 				
 				const zoom_subj = new Subject();
+				
 				this.zoomFunc = d3.zoom()
-				               .extent([[0, 0], [+this.$svg.attr('width'), +this.$svg.attr('height')]]) // TODO replace with dynamic bbox
+				               .extent([[0, 0], [+this.$svg.attr('width'), +this.$svg.attr('height')]])
 				               .on('zoom', e => {
 				               	// I think 
 				               	// h_line.attr('d', line);
@@ -175,39 +180,38 @@ export default class extends React.Component {
 				               	this.updateBrushes();
 
 				               });
-				zoom_subj.pipe(
-					bufferCount(10),
-					debounceTime(200),
-					map(buffer => buffer[buffer.length - 1].map(d => d.getTime())) // when rate falls below 10 events per 200ms
-				)
-					.subscribe(new_domain => {
-						data_controller.update(new_domain)
-							.then(did_update => {
-								if(did_update) {
-									const data = data_controller.get_data();
-									for(let i = 0; i < NUM_CH; i++) {
-										h_lines[i].data([data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])])
-												  .attr('d', line);
-									}
-								}
-							}, console.log).catch(console.log)
-					});
 
 				// force resampling of data when zoom is done manually
 				this.resampleData = new_domain => {
-					data_controller.update(new_domain)
+					data_controller.maybe_update(new_domain)
 						.then(did_update => {
 							if(did_update) {
-								const data = data_controller.get_data();
+								const data = data_controller.get_data(new_domain);
+								// destroy the boundaries between chunks and use graph interpolate
+								const flat_data = data.reduce((acc, d) => {
+									acc.push.apply(acc, d[1][0]);
+									return acc;
+								}, []);
+								// debugger;
 								for(let i = 0; i < NUM_CH; i++) {
-									h_lines[i].data([data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])])
+									// debugger;
+									h_lines[i].data([flat_data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])])
 											  .attr('d', line);
 								}
 							}
 						}, console.log).catch(console.log)
 				};
+				
+				zoom_subj.pipe(
+					bufferCount(10),
+					debounceTime(200),
+					map(buffer => buffer[buffer.length - 1].map(d => d.getTime())) // when rate falls below 10 events per 200ms
+				)
+					.subscribe(this.resampleData.bind(this));
 
 				this.$zoom.call(this.zoomFunc).on("dblclick.zoom", null);
+				this.resampleData(domain1);
+				// this.zoomFunc.event(this.$zoom);
 
 				/***** BRUSHES ******/			
 				

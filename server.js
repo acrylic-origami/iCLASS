@@ -3,8 +3,7 @@ const h5lt = require('hdf5').h5lt;
 const express = require('express');
 const app = express();
 const Frac = require('fraction.js');
-
-const DENSITY = 100; // 100 data points per window width
+const { FULL_RES_INTERVAL } = require('./src/consts.js');
 
 const f = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_050.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
 const g = f.openGroup('data');
@@ -42,7 +41,7 @@ app.get('/data', (req, res) => {
 		];
 		console.log(int_range.map(v => v.valueOf()));
 		
-		let maybe_stride = int_range[1].sub(int_range[0]).div(DENSITY).floor();
+		let maybe_stride = int_range[1].sub(int_range[0]).div((FULL_RES_INTERVAL * meta[2])).floor();
 		const stride = maybe_stride.compare(1) < 0 ? 1 : maybe_stride;
 		const count = int_range[1].sub(int_range[0]).div(stride).floor();
 		const options = { start: [0, int_range[0].valueOf()], stride: [1, stride.valueOf()], count: [dims[0], count.valueOf()]};

@@ -1,2 +1,5 @@
-export const BASEGRAPH_ZOOM = 0;
-export const EPS = 1E-8; // a tiny constant to resolve numerical problems
+module.exports = {
+	BASEGRAPH_ZOOM: 0,
+	EPS: 1E-8,
+	FULL_RES_INTERVAL: 30
+};
