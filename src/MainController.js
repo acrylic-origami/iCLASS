@@ -1,7 +1,7 @@
 import React from 'react';
 import D3Controller from './d3Controller';
 import AnnotatePopUp from './AnnotatePopUp';
-import Annotation from './Annotation';
+import AnnotationList from './AnnotationList';
 
 export default class extends React.Component {
 	constructor(props) {
@@ -31,7 +31,7 @@ export default class extends React.Component {
 			marginLeft: "300px"
 		};
 
-		this.brushWrapStyle = {
+		this.sidebarWrapStyle = {
 			position: "absolute",
 			top: "0",
 			left: "0",
@@ -41,7 +41,7 @@ export default class extends React.Component {
 			overflowX: "scroll",
 		};
 
-		this.brushInnerWrapStyle = {
+		this.sidebarInnerWrapStyle = {
 			position: "relative"
 		};
 
@@ -59,10 +59,6 @@ export default class extends React.Component {
 
 		this.mainStyle = {
 			fontFamily: "sans-serif"
-		};
-
-		this.brushListMargin = {
-			paddingBottom: "100px"
 		};
 	}
 	
@@ -161,27 +157,14 @@ export default class extends React.Component {
 				height={640}
 				/>
 		</div>
-		<div style={this.brushWrapStyle}>
-			<div style={this.brushInnerWrapStyle}>
+		<div style={this.sidebarWrapStyle}>
+			<div style={this.sidebarInnerWrapStyle}>
 				<div style={this.buttonWrapStyle}> 
 					<button style={this.buttonStyle} className="edit-zoom-toggle" id="edit-zoom-toggle" type="button" onClick={this.onEditZoomToggle}>
 						{this.state.is_editing ? 'Zoom/Pan' : 'Annotate'}
 					</button>
 				</div>
-				<div className="brush-list" style={this.brushListMargin} id="brush-list">
-					<div className="annotationList">
-						{this.state.annotations.map((annot, index) =>
-							<Annotation
-								key={"annot-" + index}
-								time={annot.startTime}
-								type={annot.type}
-								notes={annot.notes}
-								annot_id={index}
-								openNewAnnotationPopUp={this.openNewAnnotation}
-							/>
-						)}
-					</div>
-				</div>
+				<AnnotationList annotations={this.state.annotations} />
 			</div>
 		</div>
 	</div>;
