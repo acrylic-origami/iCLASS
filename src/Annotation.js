@@ -9,7 +9,8 @@ export default class extends React.Component {
 			paddingTop: "20px",
 			margin: "5px",
 			fontSize: "18px",
-			cursor: "pointer"
+			cursor: "pointer", 
+			"userSelect": "none"
 		}
 
 		this.titleStyle = {

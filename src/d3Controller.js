@@ -18,11 +18,12 @@ export default class extends React.Component {
 		this.svg = React.createRef();
 		this.zoom = React.createRef();
 		this.area = React.createRef();
-		this.gBrushes = React.createRef();
 		this.zoomFunc = () => {};
 		this.orig_domain = [];
 		this.resampleData = () => {};
 		this.x = () => {};
+		// Brush data
+		this.gBrushes = React.createRef();
 		this.newBrush = () => {};
 		this.updateBrushes = () => {};
 		this.clearBrushes = () => {};
@@ -34,8 +35,8 @@ export default class extends React.Component {
 		this.$area = d3.select(this.area.current);
 		this.$gBrushes = d3.select(this.gBrushes.current);
 		this.$zoom = d3.select(this.zoom.current);
-		this.$zoom.on("dblclick.zoom", null);
-		this.$svg.on("dblclick", this.openAnnotation);
+		this.$zoom.on("dblclick.zoom", null); // disable the default double click to zoom call
+		this.$svg.on("dblclick", this.openAnnotation); // make double click open new annotations
 		this.onDatasetUpdate();
 	}
 
@@ -44,13 +45,10 @@ export default class extends React.Component {
 			this.onDatasetUpdate();
 		}
 		
-		// When the brush list is updated from the props,
-		// Clear the brushes and add new ones
-		if(prevProps.brushes !== this.props.brushes) {
-			this.clearBrushes();
-			for(var i = 0; i < this.props.brushes.length; i++) {
-				this.newBrush(this.props.brushes[i]);
-			}
+		// When the annotation list is changed,
+		// convert the new annotation list to brushes
+		if(JSON.stringify(prevProps.annotations) !== JSON.stringify(this.props.annotations)) {
+			this.annotationsToBrushes(this.props.annotations);
 		}
 	}
 
@@ -213,6 +211,10 @@ export default class extends React.Component {
 				
 				const that = this;
 
+				// this.newBrush creates a new D3 brush and stores the brush
+				// function and data in the this.brushes array. The D3 brushes
+				// are either start and end time pairs or single points, in which
+				// case their handles are deleted such that they can only be moved.
 				this.newBrush = (data) => {
 
 					var brush = d3.brushX()
@@ -221,7 +223,7 @@ export default class extends React.Component {
 					    .on("brush", brushed)
 					    .on("end", brushend);
 
-					this.brushes.push(brush);
+					this.brushes.push({data: data, brush: brush});
 
 					const gBrush = that.$gBrushes
 									   .insert("g", '.brush')
@@ -252,17 +254,20 @@ export default class extends React.Component {
 						// add titles as custom handles
 					}
 
-					// remove all brush overlays
+					// Remove all brush overlays (only allow double click to add)
 					d3.selectAll('.brush>.overlay').remove();
 
 				  	function brushstart() {
-				    	// your stuff here
+				    	// Can add functionality here
 					};
 
 					function brushed() {
-				    	// your stuff here
+				    	// Can add functionality here
 					}
 
+					// brushend() is called everytime the brush is edited,
+					// it calls update annotation with the new data,
+					// which updates the state in the parent.
 					function brushend() {
 				    	// store/update the value of the new brush selection
 				    	const brushElem = document.getElementById('brush-' + data.ids[0]);
@@ -286,25 +291,30 @@ export default class extends React.Component {
 					}
 				}
 
+
+				// this.updateBrushes moves the brushes when the axis change on a zoom or pan event
 				this.updateBrushes = () => {
 					// manually moves each brush to the correct location on the x axis
 					that.$gBrushes.selectAll('.brush')
 								  .each((brushObject, index) => {
 
-								const brush_data = that.props.brushes[index];
+						const brush_data = this.brushes[index].data;
 
-								const brushElem = d3.select(document.getElementById('brush-' + brush_data.ids[0]));
+						const brushElem = d3.select(document.getElementById('brush-' + brush_data.ids[0]));
 
-								if(brush_data.type == "point") {
-									brushElem.call(this.brushes[index].move,
-															[that.x(brush_data.times[0]), that.x(brush_data.times[0]) + 2]);
-								} else {
-									brushElem.call(this.brushes[index].move, brush_data.times.map(that.x));
-								}
+						if(brush_data.type == "point") {
+							brushElem.call(this.brushes[index].brush.move,
+													[that.x(brush_data.times[0]), that.x(brush_data.times[0]) + 2]);
+						} else {
+							brushElem.call(this.brushes[index].brush.move, brush_data.times.map(that.x));
+						}
 
 					});
 				}
 
+				// Clear brushes is called every time the brushes are edited,
+				// it deletes all the brush elements to allow new brushes
+				// can be added.
 				this.clearBrushes = () => {
 					that.brushes.length = 0;
 
@@ -314,4 +324,80 @@ export default class extends React.Component {
 				};
 
 			}, console.log).catch(console.log);
+
+
+	// annotationsToBrushes() converts annotations to a brushes array
+	// (ie checks for onset/offset pairs), and then calls this.newBrush
+	// on each brush.
+	annotationsToBrushes = annots => {
+		this.clearBrushes();
+		// creates an array of brushes combining onsets and offsets where possible
+		const newBrushes = [];
+		var lastOnsetTime = null;
+		var lastOnsetId = null;
+		annots.map((data, index) => {
+			if(lastOnsetTime != null) { // looking for seizure
+				if(data.type == "offset") {
+					// found seizure
+					newBrushes.push({
+										type: "range",
+										times: [lastOnsetTime, data.startTime], // set brush to have times [last onset, this offset]
+										ids: [lastOnsetId, index], // this one is debatable I guess
+										titles: ["Seizure Onset", "Seizure Offset"]
+									});
+					lastOnsetTime = null;
+				} else if (data.type == "onset") {
+					// found new onset
+					newBrushes.push({
+										type: "point",
+										times: [lastOnsetTime, 
+												new Date(lastOnsetTime).setSeconds(lastOnsetTime.getSeconds() + 2)],
+										ids: [lastOnsetId],
+										titles: ["Seizure Onset", ""]
+									});
+					// update lastOnsetTime
+					lastOnsetTime = data.startTime;
+					lastOnsetId = index;
+				} else {
+					// found patient data
+					newBrushes.push({
+										type: "point",
+										times: [data.startTime, 
+												new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
+										ids: [index],
+										titles: ["Patient Event", ""]
+									});
+				}
+			} else if(data.type == "onset") {
+				// set new onset
+				lastOnsetTime = data.startTime;
+				lastOnsetId = index;
+			} else {
+				// add lonely offset or patient data
+				newBrushes.push({
+									type: "point",
+									times: [data.startTime, 
+											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
+									ids: [index],
+									titles: [(data.type == "offset") ? "Seizure Offset" : "Patient Event", ""]
+								});
+			}
+			// Last iteration
+			if(index == annots.length - 1) {
+				// add lonely onset
+				if (lastOnsetTime != null)  {
+					newBrushes.push({
+						type: "point",
+						times: [data.startTime, 
+						new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
+						ids: [index],
+						titles: ["Seizure Onset", ""]
+					});
+				}
+				// Add new brushes
+				newBrushes.map(newBrush => this.newBrush(newBrush));
+			}
+		});
+	};
 }
+
