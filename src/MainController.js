@@ -1,4 +1,5 @@
 import React from 'react';
+import {Map} from 'immutable';
 import D3Controller from './d3Controller';
 import AnnotatePopUp from './AnnotatePopUp';
 import Annotation from './Annotation';
@@ -6,98 +7,16 @@ import Annotation from './Annotation';
 export default class extends React.Component {
 	constructor(props) {
 		super(props); // props: initial: [dataset, [start, range]]
-		this.d3child = React.createRef();
 		this.state = {
 			is_editing: false,
-			has_zoomed: true,
-			zoom_times : [],
-			// For point annotations
-			screenPosY: 0,
-			screenPosX: 0,
-			type: "", 
-			notes: "",
-			annot_id: 0,
-			is_new: false,
-			is_annotating: false,
-			startTime: null,
-			endTime: null,
-			annotations: [],
-			newAnnotationId: 0,
-			brushes: []
-
-		};
-
-		this.d3WrapStyle = {
-			marginLeft: "300px"
-		};
-
-		this.brushWrapStyle = {
-			position: "absolute",
-			top: "0",
-			left: "0",
-			bottom: "0",
-			width: "308px",
-			borderRight: "1px solid #000",
-			overflowX: "scroll",
-		};
-
-		this.brushInnerWrapStyle = {
-			position: "relative"
-		};
-
-		this.buttonWrapStyle = {
-			borderBottom: "1px solid #000"
-		};
-
-		this.buttonStyle = {
-			display: "block",
-			marginLeft: "auto",
-			marginRight: "auto",
-			marginTop: "30px",
-			marginBottom: "25px"
-		};
-
-		this.mainStyle = {
-			fontFamily: "sans-serif"
-		};
-
-		this.brushListMargin = {
-			paddingBottom: "100px"
+			annotation_idx: 0,
+			annotations: new Map(),
+			annotating_id: null
 		};
 	}
 	
 	onEditZoomToggle = () => this.setState(state_ => ({
 		is_editing: !state_.is_editing
-	}));
-
-	// Should zoom to brush
-	onBrushZoom = i => this.setState(state_ => {
-		this.d3child.current.callZoom(state_.brushes[i].times);
-	});
-
-	// Opens new annotation pop up window
-	openNewAnnotation = d => this.setState(state_ => {
-		// do position logic
-		return {
-			screenPosY: d.y,
-			screenPosX: d.x,
-			is_annotating: true,
-			annotStart: d.startTime,
-			type: d.type, 
-			notes: d.notes,
-			annot_id: d.annot_id
-		};
-	});
-
-	// Closes new annotation pop up window
-	cancelAnnotation = () => this.setState(state_ => ({
-		screenPosY: 0,
-		screenPosX: 0,
-		is_annotating: false,
-		annotStart: null,
-		type: undefined, 
-		notes: undefined,
-		annot_id: undefined
 	}));
 
 	// Saves results from new annotation form
@@ -135,6 +54,18 @@ export default class extends React.Component {
 			annotations: newAnnotations
 		}));
 	};
+
+	onNewAnnotation = annotation => this.setState(state_ => {
+		annotation.set_id(state_.annotation_idx);
+		return {
+			annoation_idx: annotation_idx + 1,
+			annotations: state_.annotations.set(annotation_idx, annotation)
+		};
+	});
+	
+	onAnnotationUpdate = annotation => this.setState(state_ => ({
+		annotations: state_.has(state_.annotations.set())
+	}));
 
 	// Converts annotations to brushes, ie checks for onset/offset pairs
 	annotationsToBrushes = annots => {
@@ -207,38 +138,26 @@ export default class extends React.Component {
 	};
 
 	
-	render = () => <div style={this.mainStyle}>
-		<AnnotatePopUp
-				startTime={this.state.annotStart}
-				screenPosY={this.state.screenPosY}
-				screenPosX={this.state.screenPosX}
-				type={this.state.type}
-				notes={this.state.notes}
-				annot_id={this.state.annot_id}
-				is_annotating={this.state.is_annotating}
-				addAnnotation={this.addAnnotation}
-				cancelAnnotation={this.cancelAnnotation}
-			/>
-		<div style={this.d3WrapStyle}>
+	render = () => <div>
+		<div className="d3wrap">
 			<D3Controller
-				{...this.props}
-				ref={this.d3child}
 				is_editing={this.state.is_editing}
-				updateAnnotation={this.onUpdateAnnotation}
-				brushes={this.state.brushes}
-				openNewAnnotationPopUp={this.openNewAnnotation}
+				annotations={this.state.annotations}
+				annotating_id={this.state.annotating_id}
+				onAnnotationUpdate={this.onAnnotationUpdate}
+				onNewAnnotation={this.onNewAnnotation}
 				width={960}
 				height={640}
 				/>
 		</div>
-		<div style={this.brushWrapStyle}>
-			<div style={this.brushInnerWrapStyle}>
-				<div style={this.buttonWrapStyle}> 
-					<button style={this.buttonStyle} className="edit-zoom-toggle" id="edit-zoom-toggle" type="button" onClick={this.onEditZoomToggle}>
+		<div className="brushWrap">
+			<div className="brushInnerWrap">
+				<div className="buttonWrap"> 
+					<button className="edit-zoom-toggle" id="edit-zoom-toggle" type="button" onClick={this.onEditZoomToggle}>
 						{this.state.is_editing ? 'Zoom/Pan' : 'Annotate'}
 					</button>
 				</div>
-				<div className="brush-list" style={this.brushListMargin} id="brush-list">
+				<div className="brush-list" id="brush-list">
 					<div className="annotationList">
 						{this.state.annotations.map((annot, index) =>
 							<Annotation

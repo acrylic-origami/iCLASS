@@ -3,34 +3,6 @@ import React from 'react';
 export default class extends React.Component {
 	constructor(props) {
 		super(props); // props: initial: [dataset, [start, range]]
-
-		this.annotWrapStyle = {
-			position: "relative",
-			paddingTop: "20px",
-			margin: "5px",
-			fontSize: "18px",
-			cursor: "pointer"
-		}
-
-		this.titleStyle = {
-			position: "absolute",
-			top: "0px",
-			left: "0px",
-		}
-
-		this.timeStyle = {
-			position: "absolute",
-			top: "0px",
-			right: "0px",
-		}
-
-		this.noteStyle = {
-			color: "grey",
-			fontSize: "15px",
-			paddingLeft: "20px",
-			paddingRight: "20px",
-			paddingTop: "5px"
-		}
 	}
 	
 	// convert the type of annotation to a string title
@@ -68,15 +40,14 @@ export default class extends React.Component {
 
 	render = () =>
 		<div>
-			<div style={this.annotWrapStyle} onDoubleClick={this.openAnnotation.bind(this)}>
-				<div style={this.titleStyle}>
+			<div className="annotation" onDoubleClick={this.openAnnotation.bind(this)}>
+				<h2>
 					{this.typeToString(this.props.type)}
-				</div>
-				<div style={this.timeStyle}>
+				</h2>
+				<div className="time">
 					{this.timeToString(this.props.time)}
 				</div>
-				{(this.props.notes != undefined && this.props.notes.length > 0) ? <div style={this.noteStyle}>{this.props.notes}</div> : <div />}
-				
+				{(this.props.notes != undefined && this.props.notes.length > 0) ? <div className="note">{this.props.notes}</div> : <div />}
 			</div>
 		</div>
 }
