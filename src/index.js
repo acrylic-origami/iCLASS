@@ -18,13 +18,6 @@ const F_initial = (() => {
 			if(maybe_annotation != null) {
 				return d3.json(`annotation?id=${maybe_annotation}`); // expect server to also fetch dataset metadata
 			}
-			else if(maybe_start != null && maybe_range != null) {
-				return d3.json(``Q({
-					dataset: maybe_dataset,
-					start: parseFloat(start),
-					// range: parseFloat(range)
-				});
-			}
 			else {
 				return d3.json(`dataset_meta?dataset=${maybe_dataset}`).then(d => Object.assign({}, d, {
 					dataset: maybe_dataset,

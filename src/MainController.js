@@ -1,8 +1,6 @@
 import React from 'react';
 import {Map} from 'immutable';
 import D3Controller from './d3Controller';
-import AnnotatePopUp from './AnnotatePopUp';
-import Annotation from './Annotation';
 import {view_name} from './Util/AnnotationTypeNames';
 
 export default class extends React.Component {

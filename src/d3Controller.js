@@ -9,6 +9,8 @@ import {debounceTime, bufferCount, map} from 'rxjs/operators';
 import DataController from './FlatData';
 import {BASEGRAPH_ZOOM, EPS} from './consts';
 
+import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './Annotations';
+
 const channels = [...Array(16).keys()];
 const NUM_CH = channels.length;
 

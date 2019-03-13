@@ -1,6 +1,7 @@
 import React from 'react';
 import { Form, Field } from 'react-final-form'
 import {view_name, data_name, types} from './Util/AnnotationTypeNames';
+import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './Annotations';
 
 export default class extends React.Component {
 	constructor(props) {
