@@ -3,6 +3,7 @@ import {Map} from 'immutable';
 import D3Controller from './d3Controller';
 import AnnotatePopUp from './AnnotatePopUp';
 import Annotation from './Annotation';
+import {view_name} from './Util/AnnotationTypeNames';
 
 export default class extends React.Component {
 	constructor(props) {
@@ -130,15 +131,7 @@ export default class extends React.Component {
 							className="annotation"
 							key={"annot-" + index}
 							onDoubleClick={() => this.setState({ annotating_id: annot.id })}>
-							<h2>{(() => {
-								switch(annot.constructor) {
-									case OnsetBrush: return "Seizure Onset";
-									case OffsetBrush: return "Seizure Offset";
-									case SeizureBrush: return "Seizure";
-									case RangeBrush: return "Time Range";
-									case PointBrush: return "Point";
-								}
-							})()}</h2>
+							<h2>{view_name(annot)}</h2>
 							<div className="time">{annot.get_start().toLocaleString()}</div>
 							<div className="note">{annot.notes}</div>
 						</li>

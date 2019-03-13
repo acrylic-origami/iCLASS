@@ -73,6 +73,7 @@ export default class extends React.Component {
 		
 		if(this.props.annotating_id != null)
 			this.setState({
+				is_annotating: true,
 				annotating_id: this.props.annotating_id
 			});
 	}
@@ -109,23 +110,26 @@ export default class extends React.Component {
 
 	render = () => <div>
 		{ !this.state.is_annotating ? null :
-			<AnnotatePopUp
-					annotation={this.props.annotations.get(this.state.annotating_id) /* for existing annotations */}
-					startTime={this.state.annotStart /* for fresh annotations */}
-					screenPosY={this.state.screenPosY}
-					screenPosX={this.state.screenPosX}
-					onSubmit={annotation => {
-						const annotating_id = this.state.annotating_id;
-						this.props.onAnnotate(annotation);
-						this.setState(state_ => {
-							const ret = { is_annotating: false }
-							if(state_.annotating_id === annotating_id)
-								ret.annotating_id = null;
-							
-							return ret;
-						});
-					}}
-				/> }
+			<AnnotateView
+				annotation={this.props.annotations.get(this.state.annotating_id) /* for existing annotations */}
+				startTime={this.props.startTime}
+				screenPosY={this.state.screenPosY}
+				screenPosX={this.state.screenPosX}
+				onSubmit={annotation => {
+					const annotating_id = this.state.annotating_id;
+					this.props.onAnnotate(annotation);
+					this.setState(state_ => {
+						const ret = { is_annotating: false }
+						if(state_.annotating_id === annotating_id)
+							ret.annotating_id = null;
+						
+						return ret;
+					});
+				}}
+				onCancel={() => this.setState({ is_annotating: false })}
+				annot_id={this.props.annot_id}
+			/>
+		}
 		<svg ref={this.svg} width={this.props.width} height={this.props.height}>
 			<g ref={this.area}></g>
 			<g ref={this.gBrushes} className="brushes"></g>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Form, Field } from 'react-final-form'
+import {view_name, data_name, types} from './Util/AnnotationTypeNames';
 
 export default class extends React.Component {
 	constructor(props) {
@@ -56,7 +57,16 @@ export default class extends React.Component {
 		newTime.setMinutes(time[1]);
 		newTime.setSeconds(time[2]);
 		newTime.setMilliseconds(time[3]*10);
-		this.props.handleSubmit({...d, startTime: newTime, is_new: this.state.is_new, annot_id: this.props.annot_id});
+		
+		const new_annotation = (() => {
+			switch(d.type) {
+				case 'onset': return new OnsetBrush(newTime, [d.notes]);
+				case 'offset': return new OffsetBrush(newTime, [d.notes]);
+				case 'point': return new PointBrush(newTime, [d.notes]);
+			}
+		})();
+		
+		this.props.onSubmit(new_annotation);
 	}
 	
 	mustBeTime = value => (this.isTime(value)  ? "Error: Time must be in the format HH:MM:SS:mSmS (e.g. 23:59:59:99)" : undefined)
@@ -75,35 +85,23 @@ export default class extends React.Component {
 		return time.length > 4 | has_error;
 	}
 
-  	componentWillMount() {
-  		const start = this.props.startTime;
-
-  		this.setState(state_ => ({
-			startPlaceHolder: ((start.getHours() < 10) ? "0" : "") + start.getHours() + ":"
-							  + ((start.getMinutes() < 10) ? "0" : "") + start.getMinutes() + ":"
-							  + ((start.getSeconds() < 10) ? "0" : "") + start.getSeconds() + ":"
-							  + (((start.getMilliseconds() / 10) < 10) ? "0" : "") + (start.getMilliseconds() / 10),
-			is_new: (this.props.type == undefined)
-		}));
-  	}
-
 	render = () =>
 		<div>
 			<div style={this.titleStyle}>
-				{(this.props.type == undefined) ? 'New' : 'Edit'} Annotation
+				{(this.props.annotation == null) ? 'New' : 'Edit'} Annotation
 			</div>
 			<Form
       			onSubmit={this.onSubmit}
-      			initialValues={{ startTimeString: this.state.startPlaceHolder, type: (this.props.type == undefined) ? 'onset' : this.props.type, notes: (this.props.notes == undefined) ? '' : this.props.notes}}
-      			render={({ handleSubmit, reset, form, submitting, pristine, values }) => (
-      				<form onSubmit={handleSubmit}
+      			initialValues={{ startTimeString: , type: data_name(this.props.annotation) || 'onset', notes: (this.props.annotation != null && this.props.annotation.notes) || '' }}
+      			render={({ onSubmit, reset, form, submitting, pristine, values }) => (
+      				<form onSubmit={onSubmit}
       						 style={this.formStyle}>
           				<div style={this.sectionStyle}>
             				<div><label>Type</label></div>
             				<Field name="type" component="select">
               					<option value="onset">Seizure Onset</option>
               					<option value="offset">Seizure Offset</option>
-              					<option value="patient">Patient Event</option>
+              					<option value="point">Patient Event</option>
             				</Field>
           				</div>
           				<Field name="startTimeString" validate={this.mustBeTime}>
