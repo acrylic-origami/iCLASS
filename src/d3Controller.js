@@ -83,24 +83,26 @@ export default class extends React.Component {
 		// If range, add brush, add custom handles with titles
 		for(const annotation in this.props.annotations) {
 			const gBrush = d3.select(`brush-${annotation.id}`);
-			if(annotation instanceof OnsetBrush) {
-				gBrush.attr("class", "brush point");
+			switch(annotation.constructor) {
+				case OnsetBrush:
+					gBrush.selectAll('.brush>.handle').remove();
+					
+					gBrush.attr("class", "brush point");
 
-				// Move the brush to the startTime + a fixed width
-				gBrush.call(brush.move, [that.x(annotation.time), that.x(annotation.time) + 2]);
+					// Move the brush to the startTime + a fixed width
+					gBrush.call(brush.move, [that.x(annotation.get_start()), that.x(annotation.get_start()) + 2]);
 
-				// Remove the handles so can't be resized
-				gBrush.selectAll('.brush>.handle').remove();
+					// Remove the handles so can't be resized
+					break;
+				case RangeBrush:
+					gBrush.attr("class", "brush range");
 
-				// add titles
-			
-			} else if (data.type instanceof RangeBrush) {
-				gBrush.attr("class", "brush range");
-
-				// Move the brush to the startTime and endTime
-				gBrush.call(brush.move, [ annotation.left, annotation.right ].map(this.x));
-				
-				// add titles as custom handles
+					// Move the brush to the startTime and endTime
+					gBrush.call(brush.move, [ annotation.get_start(), annotation.get_end() ].map(this.x));
+					
+					// add titles as custom handles
+					break;
+					
 			}
 		}
 	}
