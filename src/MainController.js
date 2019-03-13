@@ -45,98 +45,65 @@ export default class extends React.Component {
 	};
 
 	// Updates the start times of annotations that were edited via the brushes
-	onUpdateAnnotation = d => {
-		const newAnnotations = this.state.annotations;
-		d.map((data, index) => {
-			newAnnotations[data.id].startTime = data.time;
-		});
-		this.setState(state_ => ({
-			annotations: newAnnotations
-		}));
+	onAnnotate = annotation => {
+		if(annotation.id == null) {
+			// new annotation
+			this.setState(state_ => {
+				const next_annotations = (() => {
+					// merge annotations where necessary
+					if(annotation instanceof OnsetBrush || annotation instanceof OffsetBrush) {
+						const targets = state_.annotations.sort((a, b) => a.get_start() - b.get_start()).toList();
+						if(annotation instanceof OnsetBrush) {
+							// looking for the offset
+							for(const target of targets) {
+								if(targets.get_start() > annotation.get_start() && targets instanceof OffsetBrush) {
+									const seizure_annotation = new SeizureBrush(
+										[annotation.get_start(), target.get_start()],
+										target.notes.concat(annotation.notes),
+										state_.annotation_idx + 1
+									);
+									return next_annotations.delete(target.id)
+									                       .set(state_.annotation_idx, seizure_annotation);
+								}
+							}
+						}
+						else {
+							// looking for the onset
+							for(const target of targets.reverse()) {
+								if(target.get_start() < annotation.get_start() && target instanceof OnsetBrush) {
+									const seizure_annotation = new SeizureBrush(
+										[targets.get_start(), annotation.get_start()],
+										target.notes.concat(annotation.notes),
+										state_.annotation_idx + 1
+									);
+									return next_annotations.delete(target.id)
+									                       .set(state_.annotation_idx, seizure_annotation);
+								}
+							}
+						}
+					}
+					
+					// fallthrough: tack the annotation onto the end
+					annotation.set_id(state_.annotation_idx);
+					return state_.annotations.set(state_.annotation_idx, annotation);
+				})();
+				
+				return {
+					annotation_idx: annotation_idx + 1,
+					annotations: next_annotations
+				};
+			});
+		}
+		else {
+			this.setState(state_ => ({
+				annotations: state_.annotations.has(annotation.id) ? state_.annotations.set(annotation.id, annotation) : state_.annotations
+			}));
+		}
 	};
-
-	onNewAnnotation = annotation => this.setState(state_ => {
-		annotation.set_id(state_.annotation_idx);
-		return {
-			annoation_idx: annotation_idx + 1,
-			annotations: state_.annotations.set(annotation_idx, annotation)
-		};
-	});
 	
 	onAnnotationUpdate = annotation => this.setState(state_ => ({
 		annotations: state_.has(state_.annotations.set())
 	}));
-
-	// Converts annotations to brushes, ie checks for onset/offset pairs
-	annotationsToBrushes = annots => {
-		// creates an array of brushes combining onsets and offsets where possible
-		const newBrushes = [];
-		var lastOnsetTime = null;
-		var lastOnsetId = null;
-		annots.map((data, index) => {
-			if(lastOnsetTime != null) { // looking for seizure
-				if(data.type == "offset") {
-					// found seizure
-					newBrushes.push({
-										type: "range",
-										times: [lastOnsetTime, data.startTime], // set brush to have times [last onset, this offset]
-										ids: [lastOnsetId, index], // this one is debatable I guess
-										titles: ["Seizure Onset", "Seizure Offset"]
-									});
-					lastOnsetTime = null;
-				} else if (data.type == "onset") {
-					// found new onset
-					newBrushes.push({
-										type: "point",
-										times: [lastOnsetTime, 
-												new Date(lastOnsetTime).setSeconds(lastOnsetTime.getSeconds() + 2)],
-										ids: [lastOnsetId],
-										titles: ["Seizure Onset", ""]
-									});
-					// update lastOnsetTime
-					lastOnsetTime = data.startTime;
-					lastOnsetId = index;
-				} else {
-					// found patient data
-					newBrushes.push({
-										type: "point",
-										times: [data.startTime, 
-												new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-										ids: [index],
-										titles: ["Patient Event", ""]
-									});
-				}
-			} else if(data.type == "onset") {
-				// set new onset
-				lastOnsetTime = data.startTime;
-				lastOnsetId = index;
-			} else {
-				// add lonely offset or patient data
-				newBrushes.push({
-									type: "point",
-									times: [data.startTime, 
-											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-									ids: [index],
-									titles: [(data.type == "offset") ? "Seizure Offset" : "Patient Event", ""]
-								});
-			}
-			if(index == annots.length - 1 && lastOnsetTime != null) {
-				// add lonely onset
-				newBrushes.push({
-									type: "point",
-									times: [data.startTime, 
-											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-									ids: [index],
-									titles: ["Seizure Onset", ""]
-								});
-			}
-		});
-		// update brushes state, which will affect d3 controller
-		this.setState(state_ => ({
-			brushes: newBrushes
-		}));
-	};
-
 	
 	render = () => <div>
 		<div className="d3wrap">
@@ -144,7 +111,7 @@ export default class extends React.Component {
 				is_editing={this.state.is_editing}
 				annotations={this.state.annotations}
 				annotating_id={this.state.annotating_id}
-				onAnnotationUpdate={this.onAnnotationUpdate}
+				onAnnotate={this.onAnnotate}
 				onNewAnnotation={this.onNewAnnotation}
 				width={960}
 				height={640}
@@ -157,20 +124,26 @@ export default class extends React.Component {
 						{this.state.is_editing ? 'Zoom/Pan' : 'Annotate'}
 					</button>
 				</div>
-				<div className="brush-list" id="brush-list">
-					<div className="annotationList">
-						{this.state.annotations.map((annot, index) =>
-							<Annotation
-								key={"annot-" + index}
-								time={annot.startTime}
-								type={annot.type}
-								notes={annot.notes}
-								annot_id={index}
-								openNewAnnotationPopUp={this.openNewAnnotation}
-							/>
-						)}
-					</div>
-				</div>
+				<ul className="brush-list" id="brush-list">
+					{this.state.annotations.map((annot) =>
+						<li
+							className="annotation"
+							key={"annot-" + index}
+							onDoubleClick={() => this.setState({ annotating_id: annot.id })}>
+							<h2>{(() => {
+								switch(annot.constructor) {
+									case OnsetBrush: return "Seizure Onset";
+									case OffsetBrush: return "Seizure Offset";
+									case SeizureBrush: return "Seizure";
+									case RangeBrush: return "Time Range";
+									case PointBrush: return "Point";
+								}
+							})()}</h2>
+							<div className="time">{annot.get_start().toLocaleString()}</div>
+							<div className="note">{annot.notes}</div>
+						</li>
+					)}
+				</ul>
 			</div>
 		</div>
 	</div>;
