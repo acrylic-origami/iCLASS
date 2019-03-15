@@ -16,4 +16,3 @@ export function data_name(annot) {
 		case PointBrush: return "point";
 	}
 }
-export const types = [ OnsetBrush, OffsetBrush, SeizureBrush, RangeBrush, PointBrush ];
