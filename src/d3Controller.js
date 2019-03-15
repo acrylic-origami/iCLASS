@@ -152,7 +152,7 @@ export default class extends React.Component {
 		// TODO account for initial zooms in props
 		
 		// DATA SETUP //
-		const domain1 = [new Date(this.props.dataset_meta.tstart), new Date(this.props.dataset_meta.tstart + FULL_RES_INTERVAL)];
+		const domain1 = [new Date(this.props.dataset_meta.tstart), new Date(this.props.dataset_meta.tstart + 30000)];
 		const data_controller = new DataController(
 			this.props.dataset_meta
 		);
@@ -177,7 +177,7 @@ export default class extends React.Component {
 		
 		const line = d3.line()
 		               .curve(d3.curveMonotoneX)
-		               .x(d => x0(new Date(d[0])))
+		               .x(d => x0(d[0]))
 		               .y(d => y(d[1]));
 
 		const h_lines =

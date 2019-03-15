@@ -54,7 +54,7 @@ export default class {
 			           	           	return acc;
 			           	           }, [])
 			           	           .map((a, i, A) => [
-			           	           	new Date(this.domain0[0].getTime() + this.dataset_meta.Fs * this.dataset_meta.point_count / lin_zoom * (chunk_idx + i / A.length)), // timestamp
+			           	           	new Date(this.domain0[0].getTime() + this.dataset_meta.point_count / this.dataset_meta.Fs * 1000 / lin_zoom * (chunk_idx - 1 + i / A.length)), // timestamp
 			           	           	a // datum
 			           	           ])
 			         );
