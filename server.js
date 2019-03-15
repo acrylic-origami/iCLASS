@@ -29,9 +29,8 @@ const data = new Map([ // TEMP
 // 	}
 // });
 
-function unflatten(data_view, dims, time_dim) {
-	tstart = tstart || new Frac(0);
-	const n_bytes = Float32Array.BYTES_PER_ELEMENT;
+function unflatten(data_view, dims, time_dim, dtype='f') {
+	const n_bytes = dtype === 'f' ? Float32Array.BYTES_PER_ELEMENT : Float64Array.BYTES_PER_ELEMENT;
 	
 	const other_dims = dims.slice(0, time_dim).concat(dims.slice(time_dim));
 	const new_dims = [dims[time_dim]].concat(other_dims);
@@ -64,7 +63,7 @@ function unflatten(data_view, dims, time_dim) {
 			}
 			
 			try {
-				const fl = data_view.getFloat32(flat_idx * n_bytes, true);
+				const fl = (dtype === 'f' ? data_view.getFloat32 : data_view.getFloat64).call(data_view, flat_idx * n_bytes, true);
 				A[idx[i + (i >= time_dim)]] = fl; // by the order of iteration, we could just use "next bytes" if this was a true buffer
 			}
 			catch(e) {
@@ -103,16 +102,16 @@ app.get('/data', (req, res) => {
 			running_start.mul(dims[1]).floor(),
 			running_end.mul(dims[1]).sub(1).ceil()
 		];
-		console.log(int_range.map(v => v.valueOf()));
 		
 		let maybe_stride = int_range[1].sub(int_range[0]).div((FULL_RES_INTERVAL * meta[2])).floor();
 		const stride = maybe_stride.compare(1) < 0 ? 1 : maybe_stride.valueOf();
+		console.log(int_range.map(v => v.valueOf()), stride);
 		const count = int_range[1].sub(int_range[0]).div(stride).floor();
 		const options = { start: [0, int_range[0].valueOf()], stride: [1, stride.valueOf()], count: [dims[0], count.valueOf()]};
 		// console.log(options);
-		const flat_data_buf = h5lt.readDatasetAsBuffer(meta[1].id, 'signal', options);
+		const flat_data_buf = new DataView(h5lt.readDatasetAsBuffer(meta[1].id, 'signal', options).buffer);
 		
-		new_chunks.push(unflatten(flat_data_buf, dims, 1, stride, int_range[0].add(meta[2] * meta[3]).div(meta[3])), meta[3]);
+		new_chunks.push(unflatten(flat_data_buf, options.count, 1, 'd'));
 	}
 	res.send(new_chunks); // let the client figure out the timings
 })
