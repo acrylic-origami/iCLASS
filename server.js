@@ -5,12 +5,18 @@ const app = express();
 const Frac = require('fraction.js');
 const { FULL_RES_INTERVAL } = require('./src/consts.js');
 
+const f_aux = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_050.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
+const g_aux = f_aux.openGroup('data');
+
 const f = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_050.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
 const g = f.openGroup('data');
 const Fs = h5lt.readDataset(g.id, 'Fs');
 const tstart = Date.parse(String.fromCharCode.apply(null, h5lt.readDataset(g.id, 'tstart')).replace('-', ' '));
 const data = new Map([ // TEMP
-	['EDMSE_pat_FR_1096_050.mat', [f, g, Fs[0], tstart]]
+	['EDMSE_pat_FR_1096_050.mat', [
+		f, g, Fs[0], tstart,
+		f_aux, g_aux
+	]]
 ]);
 // app.get('/data', (req, res, next) => {
 // 	if(req.query.annotation != null && (req.query.start == null || req.query.range == null)) {
@@ -22,6 +28,64 @@ const data = new Map([ // TEMP
 // 		next();
 // 	}
 // });
+
+function unflatten(data_view, dims, time_dim) {
+	tstart = tstart || new Frac(0);
+	const n_bytes = Float32Array.BYTES_PER_ELEMENT;
+	
+	const other_dims = dims.slice(0, time_dim).concat(dims.slice(time_dim));
+	const new_dims = [dims[time_dim]].concat(other_dims);
+	
+	function make(dims, dim_idx) {
+		if(dim_idx < dims.length - 1)
+			return [...Array(dims[dim_idx]).keys()].map(_ => make(dims, dim_idx + 1));
+		else {
+			return new Float64Array(dims[dim_idx]);
+		}
+	}
+	
+	const unflat_data = [...Array(dims[time_dim]).keys()].map(_ => make(other_dims, 0));
+	
+	(function reshape(idx, dim_idx) {
+		if(dim_idx < dims.length) {
+			for(let i = 0; i < dims[dim_idx]; i++)
+				reshape(idx.concat([i]), dim_idx + 1);
+		}
+		else {
+			let flat_idx = idx[idx.length - 1];
+			for(let i = idx.length - 1; i > 0; i--) {
+				flat_idx += idx[i - 1] * dims[i];
+			}
+			
+			let A = unflat_data[idx[time_dim]];
+			let i = 0;
+			for(; i < idx.length - 2; i++) {
+				A = A[idx[i + (i >= time_dim)]];
+			}
+			
+			try {
+				const fl = data_view.getFloat32(flat_idx * n_bytes, true);
+				A[idx[i + (i >= time_dim)]] = fl; // by the order of iteration, we could just use "next bytes" if this was a true buffer
+			}
+			catch(e) {
+				console.log(dims, idx, flat_idx);
+				throw e;
+			}
+		}
+	})([], 0);
+	
+	// const flat_stride = n_bytes * n_rows; // assume row-major
+	// const unflat_data = [...Array(n_rows).keys()].map(_ => new Float64Array(n_channels));
+	// for(let i = 0; i < n_channels; i++) {
+	// 	const packet = new Float64Array(uint8_buf.buffer.slice(i * flat_stride * n_bytes, (i + 1) * flat_stride * n_bytes));
+	// 	for(let j = 0; j < n_rows; j++) {
+	// 		const stamp = tstart.add(j * stride).mul(1000).div(Fs).valueOf(); // use millis // TODO fix the coefficient `stride / unflat_stride`
+	// 		unflat_data[j][i] = [stamp, packet[j]];
+	// 	}
+	// }
+	return unflat_data;
+}
+
 app.get('/data', (req, res) => {
 	// CONSISTENCY RULE: lower limit is included if equal; upper limit is excluded if equal
 	// expect req.query.zoom, req.query.start_N, req.query.start_D, req.query.end_N, req.query.end_D
@@ -42,32 +106,32 @@ app.get('/data', (req, res) => {
 		console.log(int_range.map(v => v.valueOf()));
 		
 		let maybe_stride = int_range[1].sub(int_range[0]).div((FULL_RES_INTERVAL * meta[2])).floor();
-		const stride = maybe_stride.compare(1) < 0 ? 1 : maybe_stride;
+		const stride = maybe_stride.compare(1) < 0 ? 1 : maybe_stride.valueOf();
 		const count = int_range[1].sub(int_range[0]).div(stride).floor();
 		const options = { start: [0, int_range[0].valueOf()], stride: [1, stride.valueOf()], count: [dims[0], count.valueOf()]};
 		// console.log(options);
 		const flat_data_buf = h5lt.readDatasetAsBuffer(meta[1].id, 'signal', options);
-		const unflat_data = [];
-		const unflat_stride = Float64Array.BYTES_PER_ELEMENT * dims[0]; // assume row-major
-		for(let i = 0; i < flat_data_buf.length; i += unflat_stride) {
-			const packet = new Float64Array(flat_data_buf.buffer.slice(i, i + unflat_stride));
-			const stamp = meta[3] + int_range[0].add(i * stride / unflat_stride).mul(1000).div(meta[2]).valueOf(); // use millis
-			// console.log(int_range[0].add(i * stride / unflat_stride))
-			unflat_data.push([stamp, packet]);
-		}
 		
-		new_chunks.push(unflat_data);
+		new_chunks.push(unflatten(flat_data_buf, dims, 1, stride, int_range[0].add(meta[2] * meta[3]).div(meta[3])), meta[3]);
 	}
-	res.send(new_chunks);
+	res.send(new_chunks); // let the client figure out the timings
 })
 // TODO some redundancy in the data methods: fix later
 app.get('/annotation', (req, res) => {
 	res.send({ dataset: 'EDMSE_pat_FR_1096_050.mat', start: 4, range: 2 });
 })
+
 app.get('/dataset_meta', (req, res) => {
 	// TODO: annotation <-> dataset
-	const meta = data.get(req.query.dataset);
-	res.send({ point_count: meta[0].getDatasetDimensions('/data/signal')[1], Fs: meta[2], tstart: meta[3] });
+	const meta = data.get('EDMSE_pat_FR_1096_050.mat');
+	const dims = meta[4].getDatasetDimensions('data/subsamples');
+	const flat_subsamples_buf = h5lt.readDatasetAsBuffer(meta[5].id, 'subsamples');
+	res.send({
+		point_count: meta[0].getDatasetDimensions('/data/signal')[1],
+		Fs: meta[2],
+		tstart: meta[3],
+		subsamples: unflatten(new DataView(flat_subsamples_buf.buffer), dims, 2)
+	});
 })
 app.use(express.static('public'));
 
