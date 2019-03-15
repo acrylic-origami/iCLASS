@@ -24,8 +24,8 @@ export class PointBrush {
 	}
 	get_start() { return this.start; }
 }
-export class OnsetBrush extends PointAnnotation {}
-export class OffsetBrush extends PointAnnotation {}
+export class OnsetBrush extends PointBrush {}
+export class OffsetBrush extends PointBrush {}
 export class RangeBrush extends Annotation {
 	constructor(range, notes, id = null) {
 		this.range = range;
