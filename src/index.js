@@ -21,7 +21,7 @@ const F_initial = (() => {
 			else {
 				return d3.json(`dataset_meta?dataset=${maybe_dataset}`).then(d => Object.assign({}, d, {
 					dataset: maybe_dataset,
-					start: parseFloat(start) || 0,
+					start: parseFloat(maybe_start) || 0,
 					// range: d.point_count / d.Fs - EPS
 				}));
 				// TODO URGENT make this case work

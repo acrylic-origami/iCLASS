@@ -7,7 +7,7 @@ import {debounceTime, bufferCount, map} from 'rxjs/operators';
 
 // import DataController from './DataController';
 import DataController from './FlatData';
-import {BASEGRAPH_ZOOM, EPS} from './consts';
+import {BASEGRAPH_ZOOM, EPS, FULL_RES_INTERVAL} from './consts';
 
 import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './Annotations';
 
@@ -17,12 +17,15 @@ const NUM_CH = channels.length;
 export default class extends React.Component {
 	constructor(props) {
 		super(props); // brushes are also included here
-		// basic dataset metadata is also included here
+		// basic dataset dataset_meta is also included here
 		
 		this.svg = React.createRef();
 		this.zoom = React.createRef();
 		this.area = React.createRef();
 		this.gBrushes = React.createRef();
+		
+		this.minimap_svg = React.createRef();
+		this.minimap_area = React.createRef();
 		
 		this.state = {
 			is_annotating: false,
@@ -37,6 +40,9 @@ export default class extends React.Component {
 		this.$area = d3.select(this.area.current);
 		this.$gBrushes = d3.select(this.gBrushes.current);
 		this.$zoom = d3.select(this.zoom.current);
+		
+		this.$minimap_svg = d3.select(this.minimap_svg.current);
+		this.$minimap_area = d3.select(this.minimap_area.current);
 		
 		this.$zoom.on("dblclick.zoom", null);
 		this.$svg.on("dblclick", e => {
@@ -73,7 +79,7 @@ export default class extends React.Component {
 			this.updateBrushes();
 		}
 		
-		if(this.props.annotating_id != null)
+		if(this.props.annotating_id != null && this.props.annotating_id !== prevProps.annotating_id) // second condition might be covered by setState matching
 			this.setState({
 				is_annotating: true,
 				annotating_id: this.props.annotating_id
@@ -137,15 +143,18 @@ export default class extends React.Component {
 			<g ref={this.gBrushes} className="brushes"></g>
 			<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} width={this.props.width} height={this.props.height} ref={this.zoom} />
 		</svg>
+		<svg ref={this.minimap_svg} width={this.props.width} height={this.props.height}>
+			<g ref={this.minimap_area}></g>
+		</svg>
 	</div>
 
 	onDatasetUpdate = () => {
 		// TODO account for initial zooms in props
 		
 		// DATA SETUP //
-		const domain1 = [new Date(this.props.metadata.tstart), new Date(this.props.metadata.tstart + 30E3)]; // TODO clean this
+		const domain1 = [new Date(this.props.dataset_meta.tstart), new Date(this.props.dataset_meta.tstart + FULL_RES_INTERVAL)];
 		const data_controller = new DataController(
-			this.props.metadata
+			this.props.dataset_meta
 		);
 		
 		// UI SETUP //
@@ -174,13 +183,10 @@ export default class extends React.Component {
 		const h_lines =
 			channels.map(ch =>
 				this.$area.append('path')
-					.data([]) // flat_data.map(packet => [packet[0], packet[1][ch] / (NUM_CH + 2) + offset(ch)])
 		        	.attr('class', 'line line-num-'+ch)
-		        	.attr('d', line)
 		   );
 		
 		const zoom_subj = new Subject();
-		
 		this.zoomFunc = d3.zoom()
 		               .extent([[0, 0], [+this.$svg.attr('width'), +this.$svg.attr('height')]])
 		               .on('zoom', e => {
@@ -214,15 +220,15 @@ export default class extends React.Component {
 					if(did_update) {
 						const data = data_controller.get_data(new_domain);
 						// destroy the boundaries between chunks and use graph interpolate
-						const flat_data = data.reduce((acc, d) => {
-							acc.push.apply(acc, d[1][0]);
-							return acc;
-						}, []);
 						// debugger;
 						for(let i = 0; i < NUM_CH; i++) {
 							// debugger;
-							h_lines[i].data([flat_data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])])
-									  .attr('d', line);
+							h_lines[i].attr(
+								'd',
+								line(
+									data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])
+								)
+							);
 						}
 					}
 				}, console.log).catch(console.log)
@@ -233,8 +239,12 @@ export default class extends React.Component {
 			debounceTime(200),
 			map(buffer => buffer[buffer.length - 1].map(d => d.getTime())) // when rate falls below 10 events per 200ms
 		)
-			.subscribe(this.resampleData.bind(this));
+			.subscribe(resampleData);
 
-		this.resampleData(domain1);
+		resampleData(domain1);
+		
+		
+		// MINIMAP SETUP
+		
 	}
 }

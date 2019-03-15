@@ -5,17 +5,17 @@ import { Map } from 'es6-shim';
 import { FULL_RES_INTERVAL } from './consts';
 
 export default class {
-	constructor(dataset, domain0) {
+	constructor(dataset_meta) {
 		// StampedData := Array<float, Array<float>>
-		this.dataset = dataset;
+		this.dataset_meta = dataset_meta;
 		this.chunks = new Map(); // Map<idx: int, StampedData>
-		this.domain0 = domain0;
-		this.zoom = Math.ceil(Math.log2((domain0[1] - domain0[0]) / 1000 / 30)); // FULL_RES_INTERVAL
+		this.domain0 = [new Date(dataset_meta.tstart), new Date(dataset_meta.tstart + dataset_meta.point_count / dataset_meta.Fs * 1000)];
+		this.zoom = Math.ceil(Math.log2((this.domain0[1] - this.domain0[0]) / (FULL_RES_INTERVAL * 1000))); // 
 		// this.requestor = requestor; // (zoom: int, start: Frac, end: Frac) => Promise<Array<StampedData>>
 	}
 	
 	/* protected */
-	request = (zoom, start, end) => d3.json(`data?dataset=${this.dataset}&zoom=${zoom}&start_N=${start.n}&start_D=${start.d}&end_N=${end.n}&end_D=${end.d}`);
+	request = (zoom, start, end) => d3.json(`data?dataset=${this.dataset_meta.dataset}&zoom=${zoom}&start_N=${start.n}&start_D=${start.d}&end_N=${end.n}&end_D=${end.d}`);
 	
 	maybe_update(domain) {
 		const new_chunks = this.domain_to_numerators(domain)
@@ -41,10 +41,25 @@ export default class {
 	}
 	
 	get_data(domain) {
+		const lin_zoom = Math.pow(2, this.zoom);
 		return this.domain_to_numerators(domain)
 		           .slice(1)
 		           .filter(chunk_idx => this.chunks.has(chunk_idx))
-		           .map(chunk_idx => [chunk_idx, this.chunks.get(chunk_idx)]);
+		           .reduce((acc, chunk_idx) => {
+		           	acc.push.apply(
+		           		acc, 
+			           	this.chunks.get(chunk_idx)
+			           	           .reduce((acc, a) => {
+			           	           	acc.push.apply(acc, a);
+			           	           	return acc;
+			           	           }, [])
+			           	           .map((a, i, A) => [
+			           	           	new Date(this.domain0[0].getTime() + this.dataset_meta.Fs * this.dataset_meta.point_count / lin_zoom * (chunk_idx + i / A.length)), // timestamp
+			           	           	a // datum
+			           	           ])
+			         );
+			         return acc;
+		           }, []);
 	}
 	
 	/* protected */
@@ -53,7 +68,7 @@ export default class {
 			new Frac(domain[0] - this.domain0[0], this.domain0[1] - this.domain0[0]),
 			new Frac(domain[1] - this.domain0[0], this.domain0[1] - this.domain0[0])
 		];
-		console.log(domain_frac);
+		// console.log(domain_frac);
 		// get all integer keys that are spanned by this range at the zoom level
 		// ceil of each frac over the 1/2^zoom
 		const bounds = [

@@ -107,6 +107,7 @@ export default class extends React.Component {
 	render = () => <div>
 		<div className="d3wrap">
 			<D3Controller
+				dataset_meta={this.props.dataset_meta}
 				is_editing={this.state.is_editing}
 				annotations={this.state.annotations}
 				annotating_id={this.state.annotating_id}
@@ -124,7 +125,7 @@ export default class extends React.Component {
 					</button>
 				</div>
 				<ul className="brush-list" id="brush-list">
-					{this.state.annotations.map((annot) =>
+					{this.state.annotations.toList().map((annot) =>
 						<li
 							className="annotation"
 							key={"annot-" + index}
