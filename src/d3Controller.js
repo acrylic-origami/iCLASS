@@ -178,7 +178,7 @@ export default class extends React.Component {
 			const offset = i => (i + 0.5 - NUM_CH / 2) * channel_offset;
 			
 			const line = d3.line()
-			               .curve(d3.curveMonotoneX)
+			               .curve(d3.curveLinear)
 			               .x(d => x0(d[0]))
 			               .y(d => y(d[1]));
 
@@ -213,7 +213,7 @@ export default class extends React.Component {
 
 			               });
 			
-			this.$zoom.call(this.zoomFunc);
+			this.$zoom.call(this.zoomFunc).on('dblclick.zoom', null);
 			
 			// force resampling of data when zoom is done manually
 			const resampleData = new_domain => {

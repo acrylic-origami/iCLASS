@@ -9,7 +9,7 @@ const hash = document.location.hash.substring(1);
 
 const maybe_annotation = params.get('annotation');
 // const maybe_dataset = params.get('dataset');
-const maybe_dataset = 'EDMSE_pat_FR_1096_050.mat';
+const maybe_dataset = 'EDMSE_pat_FR_1096_002.mat';
 const F_initial = (() => {
 	if(maybe_annotation != null || maybe_dataset != null) {
 		return (() => {

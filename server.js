@@ -5,15 +5,15 @@ const app = express();
 const Frac = require('fraction.js');
 const { FULL_RES_INTERVAL } = require('./src/consts.js');
 
-const f_aux = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_050.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
+const f_aux = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_002.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
 const g_aux = f_aux.openGroup('data');
 
-const f = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_050.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
+const f = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_002.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
 const g = f.openGroup('data');
 const Fs = h5lt.readDataset(g.id, 'Fs');
 const tstart = Date.parse(String.fromCharCode.apply(null, h5lt.readDataset(g.id, 'tstart')).replace('-', ' '));
 const data = new Map([ // TEMP
-	['EDMSE_pat_FR_1096_050.mat', [
+	['EDMSE_pat_FR_1096_002.mat', [
 		f, g, Fs[0], tstart,
 		f_aux, g_aux
 	]]
@@ -89,7 +89,7 @@ app.get('/data', (req, res) => {
 	// CONSISTENCY RULE: lower limit is included if equal; upper limit is excluded if equal
 	// expect req.query.zoom, req.query.start_N, req.query.start_D, req.query.end_N, req.query.end_D
 	// also expect (2^-zoom) divides (start - end)
-	const meta = data.get('EDMSE_pat_FR_1096_050.mat');
+	const meta = data.get('EDMSE_pat_FR_1096_002.mat');
 	const dims = meta[0].getDatasetDimensions('/data/signal');
 	
 	const frac_start = new Frac(parseInt(req.query.start_N)).div(parseInt(req.query.start_D));
@@ -99,34 +99,41 @@ app.get('/data', (req, res) => {
 	for(let running_end = frac_start.add(inc); running_end.compare(frac_end) <= 0; running_end = running_end.add(inc)) {
 		const running_start = running_end.sub(inc);
 		const int_range = [
-			running_start.mul(dims[1]).floor(),
-			running_end.mul(dims[1]).sub(1).ceil()
+			running_start.mul(dims[0]).floor(),
+			running_end.mul(dims[0]).sub(1).ceil()
 		];
 		
 		let maybe_stride = int_range[1].sub(int_range[0]).div((FULL_RES_INTERVAL * meta[2])).floor();
 		const stride = maybe_stride.compare(1) < 0 ? 1 : maybe_stride.valueOf();
 		console.log(int_range.map(v => v.valueOf()), stride);
 		const count = int_range[1].sub(int_range[0]).div(stride).floor();
-		const options = { start: [0, int_range[0].valueOf()], stride: [1, stride.valueOf()], count: [dims[0], count.valueOf()]};
-		// console.log(options);
-		const flat_data_buf = new DataView(h5lt.readDatasetAsBuffer(meta[1].id, 'signal', options).buffer);
+		const options = { start: [int_range[0].valueOf(), 0], stride: [1, stride.valueOf()], count: [count.valueOf(), dims[1]]};
+		console.log(options);
+		const flat_data_buf = h5lt.readDatasetAsBuffer(meta[1].id, 'signal', options).buffer;
 		
-		new_chunks.push(unflatten(flat_data_buf, options.count, 1, 'd'));
+		const chunk = [];
+		bytes_per_slice = Float64Array.BYTES_PER_ELEMENT * options.count[1];
+		for(let i = 0; i < options.count[0]; i++) {
+			chunk.push(new Float64Array(flat_data_buf.slice(i * bytes_per_slice, (i + 1) * bytes_per_slice)));
+		}
+		new_chunks.push(chunk);
+		
+		// new_chunks.push(unflatten(new DataView(flat_data_buf), options.count, 1, 'd'));
 	}
 	res.send(new_chunks); // let the client figure out the timings
 })
 // TODO some redundancy in the data methods: fix later
 app.get('/annotation', (req, res) => {
-	res.send({ dataset: 'EDMSE_pat_FR_1096_050.mat', start: 4, range: 2 });
+	res.send({ dataset: 'EDMSE_pat_FR_1096_002.mat', start: 4, range: 2 });
 })
 
 app.get('/dataset_meta', (req, res) => {
 	// TODO: annotation <-> dataset
-	const meta = data.get('EDMSE_pat_FR_1096_050.mat');
+	const meta = data.get('EDMSE_pat_FR_1096_002.mat');
 	const dims = meta[4].getDatasetDimensions('data/subsamples');
 	const flat_subsamples_buf = h5lt.readDatasetAsBuffer(meta[5].id, 'subsamples');
 	res.send({
-		point_count: meta[0].getDatasetDimensions('/data/signal')[1],
+		point_count: meta[0].getDatasetDimensions('/data/signal')[0],
 		Fs: meta[2],
 		tstart: meta[3],
 		subsamples: unflatten(new DataView(flat_subsamples_buf.buffer), dims, 2)
