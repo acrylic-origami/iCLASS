@@ -1,5 +1,6 @@
 import React from 'react';
 import * as d3 from 'd3';
+import * as d3_multi from 'd3-selection-multi';
 import Q from 'q';
 import Frac from 'fraction.js';
 import {fromEvent, Subject} from 'rxjs';
@@ -143,7 +144,7 @@ export default class extends React.Component {
 			<g ref={this.gBrushes} className="brushes"></g>
 			<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} width={this.props.width} height={this.props.height} ref={this.zoom} />
 		</svg>
-		<svg ref={this.minimap_svg} width={this.props.width} height={this.props.height}>
+		<svg ref={this.minimap_svg} width={this.props.width} height={100}>
 			<g ref={this.minimap_area}></g>
 		</svg>
 	</div>
@@ -158,93 +159,124 @@ export default class extends React.Component {
 		);
 		
 		// UI SETUP //
-		this.x = d3.scaleTime()
-		            .range([0, +this.$svg.attr('width')])
-		            .domain(domain1);
-		const x0 = this.x.copy();
-		const y = d3.scaleLinear()
-		            .range([+this.$svg.attr('height'), 0])
-		            .domain([-200, 200]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
+		(() => {
+			this.x = d3.scaleTime()
+			            .range([0, +this.$svg.attr('width')])
+			            .domain(domain1);
+			const x0 = this.x.copy();
+			const y = d3.scaleLinear()
+			            .range([+this.$svg.attr('height'), 0])
+			            .domain([-200, 200]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
-		const x_ax = d3.axisBottom(this.x),
-		      y_ax = d3.axisLeft(y);
-		               
-		const h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(x_ax);
-		const h_y_ax = this.$area.append('g').attr('class', 'axis axis--y').call(y_ax);
+			const x_ax = d3.axisBottom(this.x),
+			      y_ax = d3.axisLeft(y);
+			               
+			const h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(x_ax);
+			const h_y_ax = this.$area.append('g').attr('class', 'axis axis--y').call(y_ax);
 
-		const channel_offset = (y.domain()[1]-y.domain()[0])/(NUM_CH + 2); // +2 leaves gap at bottom and top
-		const offset = i => (i + 0.5 - NUM_CH / 2) * channel_offset;
-		
-		const line = d3.line()
-		               .curve(d3.curveMonotoneX)
-		               .x(d => x0(d[0]))
-		               .y(d => y(d[1]));
+			const channel_offset = (y.domain()[1]-y.domain()[0])/(NUM_CH + 2); // +2 leaves gap at bottom and top
+			const offset = i => (i + 0.5 - NUM_CH / 2) * channel_offset;
+			
+			const line = d3.line()
+			               .curve(d3.curveMonotoneX)
+			               .x(d => x0(d[0]))
+			               .y(d => y(d[1]));
 
-		const h_lines =
-			channels.map(ch =>
-				this.$area.append('path')
-		        	.attr('class', 'line line-num-'+ch)
-		   );
-		
-		const zoom_subj = new Subject();
-		this.zoomFunc = d3.zoom()
-		               .extent([[0, 0], [+this.$svg.attr('width'), +this.$svg.attr('height')]])
-		               .on('zoom', e => {
-		               	// I think 
-		               	// h_line.attr('d', line);
-		               	const tf = d3.event.transform;
-		               	// if has_zoomed is false, the new domain should be the one passed by props
-		               	const new_domain =  tf.rescaleX(x0).domain();//this.props.has_zoomed ? t_domain : this.props.zoom_times;
-		               	zoom_subj.next(new_domain);
-		               	this.x.domain(new_domain);
-		               	h_lines.forEach(h_line => {
-		               		const tf_str = `translate(${tf.x} 0) scale(${tf.k} 1)`;;
-			               	h_line.attr('transform', tf_str); // assuming non-scaling stroke; much better performance
-			               	// this.$gBrushes.attr('transform', tf_str);
-			               	// this.$gBrushes.selectAll('.handle').attr('width', 6/tf.k);
-			               	// h_line.attr('d', line) // without non-scaling stroke, quite wasteful
-		               	}); //Object.assign({}, , { y: 1 }))); // scale only X
-		               	h_x_ax.call(x_ax);
+			const h_lines =
+				channels.map(ch =>
+					this.$area.append('path')
+			        	.attr('class', 'line line-num-'+ch)
+			   );
+			
+			const zoom_subj = new Subject();
+			this.zoomFunc = d3.zoom()
+			               .extent([[0, 0], [+this.$svg.attr('width'), +this.$svg.attr('height')]])
+			               .on('zoom', e => {
+			               	// I think 
+			               	// h_line.attr('d', line);
+			               	const tf = d3.event.transform;
+			               	// if has_zoomed is false, the new domain should be the one passed by props
+			               	const new_domain =  tf.rescaleX(x0).domain();//this.props.has_zoomed ? t_domain : this.props.zoom_times;
+			               	zoom_subj.next(new_domain);
+			               	this.x.domain(new_domain);
+			               	h_lines.forEach(h_line => {
+			               		const tf_str = `translate(${tf.x} 0) scale(${tf.k} 1)`;;
+				               	h_line.attr('transform', tf_str); // assuming non-scaling stroke; much better performance
+				               	// this.$gBrushes.attr('transform', tf_str);
+				               	// this.$gBrushes.selectAll('.handle').attr('width', 6/tf.k);
+				               	// h_line.attr('d', line) // without non-scaling stroke, quite wasteful
+			               	}); //Object.assign({}, , { y: 1 }))); // scale only X
+			               	h_x_ax.call(x_ax);
 
-		               	// update brushes through x()
-		               	this.updateBrushes();
+			               	// update brushes through x()
+			               	this.updateBrushes();
 
-		               });
-		
-		this.$zoom.call(this.zoomFunc);
-		
-		// force resampling of data when zoom is done manually
-		const resampleData = new_domain => {
-			data_controller.maybe_update(new_domain)
-				.then(did_update => {
-					if(did_update) {
-						const data = data_controller.get_data(new_domain);
-						// destroy the boundaries between chunks and use graph interpolate
-						// debugger;
-						for(let i = 0; i < NUM_CH; i++) {
+			               });
+			
+			this.$zoom.call(this.zoomFunc);
+			
+			// force resampling of data when zoom is done manually
+			const resampleData = new_domain => {
+				data_controller.maybe_update(new_domain)
+					.then(did_update => {
+						if(did_update) {
+							const data = data_controller.get_data(new_domain);
+							// destroy the boundaries between chunks and use graph interpolate
 							// debugger;
-							h_lines[i].attr(
-								'd',
-								line(
-									data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])
-								)
-							);
+							for(let i = 0; i < NUM_CH; i++) {
+								// debugger;
+								h_lines[i].attr(
+									'd',
+									line(
+										data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])
+									)
+								);
+							}
 						}
-					}
-				}, console.log).catch(console.log)
-		};
-		
-		zoom_subj.pipe(
-			bufferCount(10),
-			debounceTime(200),
-			map(buffer => buffer[buffer.length - 1].map(d => d.getTime())) // when rate falls below 10 events per 200ms
-		)
-			.subscribe(resampleData);
+					}, console.log).catch(console.log)
+			};
+			
+			zoom_subj.pipe(
+				bufferCount(10),
+				debounceTime(200),
+				map(buffer => buffer[buffer.length - 1].map(d => d.getTime())) // when rate falls below 10 events per 200ms
+			)
+				.subscribe(resampleData);
 
-		resampleData(domain1);
-		
+			resampleData(domain1);
+		})();
 		
 		// MINIMAP SETUP
-		
+		(() => {
+			const domain0 = [new Date(this.props.dataset_meta.tstart), this.props.dataset_meta.tstart + this.props.dataset_meta.point_count / this.props.dataset_meta.Fs * 1000];
+			const x = d3.scaleTime()
+			            .range([0, +this.$minimap_svg.attr('width')])
+			            .domain([domain0]);
+			const x0 = this.x.copy();
+			const y = d3.scaleLog()
+			            .range([+this.$minimap_svg.attr('height'), 0])
+			            .domain([1E-3, 10000]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
+
+			const x_ax = d3.axisBottom(x),
+			      y_ax = d3.axisLeft(y);
+			      
+			const h_x_ax = this.$minimap_area.append('g').attr('class', 'axis axis--x').call(x_ax);
+			const h_y_ax = this.$minimap_area.append('g').attr('class', 'axis axis--y').call(y_ax);
+			
+			const that = this;
+			this.$minimap_area.selectAll('line')
+			                  .data(this.props.dataset_meta.subsamples)
+			                  .enter()
+			                  .append('line')
+			                  .each(function (d, i) {
+			                  	d3.select(this).attrs({
+				                  	'class': 'minimap-chart-ele',
+				                  	'x1': `${i / that.props.dataset_meta.subsamples.length * 100}%`,
+				                  	'x2': `${i / that.props.dataset_meta.subsamples.length * 100}%`,
+				                  	'y1': y(Math.max(d[0][0] - d[0][1], 1E-2)), // 1-sigma
+				                  	'y2': y(d[0][0] + d[0][1])
+				                  })
+			                  });
+		})();
 	}
 }

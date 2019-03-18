@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "d3": "^5.7.0",
+    "d3-selection-multi": "^1.0.1",
     "es6-shim": "^0.35.4",
     "express": "^4.16.4",
     "final-form": "^4.11.1",
