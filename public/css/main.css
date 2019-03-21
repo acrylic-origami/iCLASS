@@ -1,0 +1,141 @@
+body, html {
+	margin:0;
+	width:100%;
+	height:100%;
+	font-family: Helvetica, sans-serif;
+}
+
+button {}
+
+.sandbox {
+	position:absolute;
+	left:-9999px;
+	top:-9999px;
+	visibility:none;
+	z-index:-999;
+	pointer-events:none;
+}
+
+div#main {}
+	div.brushWrap {
+		position: absolute;
+		top: 0;
+		left: 0;
+		bottom: 0;
+		width: 308px;
+		border-right: 1px solid #000;
+		overflow-x: scroll;
+	}
+	div.brushInnerWrap {
+		position: relative;
+	}
+	div.buttonWrap {
+		border-bottom: 1px solid #000;
+	}
+		div.buttonWrap > button {
+			display: block;
+			margin: 30px auto 25px auto;
+		}
+	.brush-list {
+		padding-bottom: 100px;
+	}
+	
+	.annotation {
+		position: relative;
+		padding-top: 20px;
+		margin: 5px;
+		font-size: 18px;
+		cursor: pointer;
+	}
+		.annotation > h2 {
+			position: absolute;
+			top: 0px;
+			left: 0px;
+			font-size:1.2em;
+		}
+		.annotation > .time {
+			position: absolute,
+			top: 0px,
+			right: 0px,
+		}
+		.annotation > .note {
+			color: grey,
+			font-Size: 15px,
+			padding: 5px 20px 0 20px,
+		}
+
+	.d3wrap {
+		margin-left:300px;
+	}
+		canvas.plot {
+			position:absolute;
+			z-index:1;
+		}
+		svg.plot {
+			z-index:2;
+		}
+		.svg-wrap {
+			margin-left:200px;
+		}
+
+			.line {
+				stroke-width:1px;
+				vector-effect:non-scaling-stroke;
+				stroke:black;
+				fill:none;
+			}
+			.zoom {
+				cursor: move;
+				fill: none;
+				pointer-events: all;
+			}
+			.brush .selection {
+				stroke: #178ccb;
+				fill: #178ccb;
+			}
+
+			.brush.point .selection {
+				stroke: #178ccb;
+				fill: #178ccb;
+				fill-opacity: 1;
+			}
+
+			.brush .range .selection {
+				stroke: #178ccb;
+				fill: #178ccb;
+			}
+			
+			.minimap-chart-ele {
+				stroke:#000;
+				stroke-width:1px;
+			}
+	
+	
+		.annotation .overlayStyle {
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			right: 0;
+			left: 0;
+			z-index: 999;
+		}
+		.annotation .menuStyle {
+			position: absolute;
+			background-color: white;
+			top: 0px;
+			left: 0px;
+			z-index: 1000;
+			border: 1px solid #ccc;
+			padding: 20px;
+			box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+			border-radius: 3px;
+		}
+		.annotation .annotationBarStyle {
+			position: absolute;
+			z-index: 998;
+			height: 640px;
+			width: 2px;
+			background-color: #178ccb;
+			top: 9px;
+			left: 0px
+		}
