@@ -29,7 +29,34 @@ const data = new Map([ // TEMP
 // 	}
 // });
 
-function unflatten(data_view, dims, time_dim, dtype='f') {
+function unflatten(buf, dims, dtype='f', idx=[]) {
+	const TypedArray = dtype === 'f' ? Float32Array : Float64Array;
+	const n_bytes = TypedArray.BYTES_PER_ELEMENT;
+	
+	let flat_idx = idx[idx.length - 1];
+	for(let i = idx.length - 1; i > 0; i--) {
+		flat_idx += idx[i - 1] * dims[i];
+	}
+	
+	switch(dims.length - idx.length) {
+		case 1:
+			return new TypedArray(buf.slice(flat_idx * dims[idx.length] * n_bytes, (flat_idx * dims[idx.length] + dims[dims.length - 1]) * n_bytes));
+		// case 2:
+		// 	const chunk = [];
+		// 	bytes_per_slice = n_bytes * dims[dims.length - 1];
+		// 	for(let i = 0; i < dims[dims.length - 2]; i++) {
+		// 		chunk.push(new TypedArray(buf.slice(flat_idx + i * bytes_per_slice, flat_idx + (i + 1) * bytes_per_slice)));
+		// 	}
+		// 	return chunk;
+		default:
+			const chunks = [];
+			for(let i = 0; i < dims[idx.length]; i++)
+				chunks.push(unflatten(buf, dims, dtype, idx.concat([i])));
+			return chunks;
+	}
+}
+
+function unflatten_transpose(data_view, dims, time_dim, dtype='f') {
 	const n_bytes = dtype === 'f' ? Float32Array.BYTES_PER_ELEMENT : Float64Array.BYTES_PER_ELEMENT;
 	
 	const other_dims = dims.slice(0, time_dim).concat(dims.slice(time_dim));
@@ -111,12 +138,7 @@ app.get('/data', (req, res) => {
 		console.log(options);
 		const flat_data_buf = h5lt.readDatasetAsBuffer(meta[1].id, 'signal', options).buffer;
 		
-		const chunk = [];
-		bytes_per_slice = Float64Array.BYTES_PER_ELEMENT * options.count[1];
-		for(let i = 0; i < options.count[0]; i++) {
-			chunk.push(new Float64Array(flat_data_buf.slice(i * bytes_per_slice, (i + 1) * bytes_per_slice)));
-		}
-		new_chunks.push(chunk);
+		new_chunks.push(unflatten(flat_data_buf, options.count, 'd'));
 		
 		// new_chunks.push(unflatten(new DataView(flat_data_buf), options.count, 1, 'd'));
 	}
@@ -132,11 +154,12 @@ app.get('/dataset_meta', (req, res) => {
 	const meta = data.get('EDMSE_pat_FR_1096_002.mat');
 	const dims = meta[4].getDatasetDimensions('data/subsamples');
 	const flat_subsamples_buf = h5lt.readDatasetAsBuffer(meta[5].id, 'subsamples');
+	console.log(dims);
 	res.send({
 		point_count: meta[0].getDatasetDimensions('/data/signal')[0],
 		Fs: meta[2],
 		tstart: meta[3],
-		subsamples: unflatten(new DataView(flat_subsamples_buf.buffer), dims, 2)
+		subsamples: unflatten(flat_subsamples_buf.buffer, dims)
 	});
 })
 app.use(express.static('public'));
