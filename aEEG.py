@@ -12,9 +12,9 @@ def run():
 		g.create_group('data')
 			
 		data = np.array(f['data/signal']) ** 2
-		nrows = data.shape[1] // RESOLUTION
-		resampled = np.reshape(f['data/signal'][:(nrows * RESOLUTION)], data.shape[:-1] + (nrows, RESOLUTION))
-		g.create_dataset('data/subsamples', dtype='f', data=[np.mean(resampled, 2), np.std(resampled, 2)])
+		nrows = data.shape[0] // RESOLUTION
+		resampled = np.reshape(f['data/signal'][:(nrows * RESOLUTION)], (nrows, RESOLUTION) + data.shape[1:])
+		g.create_dataset('data/subsamples', dtype='f', data=[np.mean(resampled, 0), np.std(resampled, 0)])
 	except:
 		raise Exception()
 	finally:
