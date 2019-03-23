@@ -1,6 +1,7 @@
 const hdf5 = require('hdf5').hdf5;
 const h5lt = require('hdf5').h5lt;
 const express = require('express');
+const path = require('path');
 const app = express();
 const Frac = require('fraction.js');
 const { FULL_RES_INTERVAL } = require('./src/consts.js');
@@ -162,7 +163,13 @@ app.get('/dataset_meta', (req, res) => {
 		subsamples: unflatten(flat_subsamples_buf.buffer, dims)
 	});
 })
+
 app.use(express.static('public'));
+
+// For react-router
+app.get('*', (req, res) => {
+	res.sendFile(path.join(__dirname + '/public/index.html'));
+})
 
 app.listen(8080);
 // const g = f.openGroup('data');
