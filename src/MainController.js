@@ -1,5 +1,6 @@
 import React from 'react';
 import {Map} from 'immutable';
+import { Link } from "react-router-dom";
 import D3Controller from './d3Controller';
 import {view_name} from './Util/AnnotationTypeNames';
 
@@ -119,7 +120,8 @@ export default class extends React.Component {
 		</div>
 		<div className="brushWrap">
 			<div className="brushInnerWrap">
-				<div className="buttonWrap"> 
+				<div className="buttonWrap">
+					<Link to={"/" + this.props.patientID}>back</Link>
 					<button className="edit-zoom-toggle" id="edit-zoom-toggle" type="button" onClick={this.onEditZoomToggle}>
 						{this.state.is_editing ? 'Zoom/Pan' : 'Annotate'}
 					</button>

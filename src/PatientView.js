@@ -71,7 +71,7 @@ export default class extends React.Component {
 		const params = new URLSearchParams(document.location.search.substring(1));
 		return <div>
 			{(params.get('dataset') != null) ? 
-				<DatasetView />
+				<DatasetView patientID={this.props.patientID} />
 			:
 				<div>
 					{(this.state.loaded) ?

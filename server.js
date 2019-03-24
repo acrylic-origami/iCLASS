@@ -181,7 +181,7 @@ app.get('/get_patients', (req, res) => {
 })
 
 app.get('/get_datasets', (req, res) => {
-  	const datasets = getMatFiles(path.join(__dirname +'/patient_data/'+req.query.patientId));
+  	const datasets = getMatFiles(path.join(__dirname +'/patient_data/' + req.query.patientId));
 	console.log(datasets);
 	res.send({datasets: datasets});
 })

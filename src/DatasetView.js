@@ -67,6 +67,6 @@ export default class extends React.Component {
 
 	render = () =>
 		<div>
-			{(this.state.loaded) ? <MainController dataset_meta={this.state.meta} /> : <div></div>}
+			{(this.state.loaded) ? <MainController dataset_meta={this.state.meta} patientID={this.props.patientID} /> : <div></div>}
 		</div>
 }
