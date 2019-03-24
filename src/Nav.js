@@ -4,6 +4,9 @@ import { Route,
 	     BrowserRouter,
 	     Switch
 } from "react-router-dom";
+import * as d3 from 'd3';
+import * as d3_multi from 'd3-selection-multi';
+import Q from 'q';
 import PatientNav from './PatientNav';
 import PatientView from './PatientView';
 
@@ -12,7 +15,8 @@ export default class extends React.Component {
 		super(props);
 
 		this.state = {
-			patientAccounts: ['1', '2', '3']
+			patientAccounts: [],
+			loaded: false
 		};
 
 		this.browserWrap = {
@@ -20,22 +24,55 @@ export default class extends React.Component {
 		}
 	}
 
+	componentDidMount() {
+		// Load patient list
+		const P_initial = (() => {
+			if (true) return d3.json(`/get_patients`); // call get patients
+			else return Q.fcall(() => { throw new Exception(); });
+		})();
+		P_initial.then(results => {
+			if(document.readyState === 'complete') {
+				this.setState(state_ => ({
+					patientAccounts: results.patients,
+					loaded: true
+				}));
+			}
+			else {
+				window.addEventListener('load', () => {
+					this.setState(state_ => ({
+						patientAccounts: results.patients,
+						loaded: true
+					}));
+				});
+			}
+		}, e => {
+			// retry or show dataset selection screen
+		});
+	}
+
 	render = () =>
 		<div>
-			<BrowserRouter>
-				<div>
-					<Switch>
-						<Route exact path={"/"} render={props => <PatientNav {...props} patientNotFound={false} patientAccounts={this.state.patientAccounts} />} />
-						{this.state.patientAccounts.map((id) => 
-							<Route key={"p_view_" + id}
-							       exact path={"/patient" + id}
-								   render={props => <PatientView {...props}
-								   patientID={"patient" + id}
-								   patientAccounts={this.state.patientAccounts} />} />
-						)}
-						<Route render={props => <PatientNav {...props} patientNotFound={true} patientAccounts={this.state.patientAccounts} />} />
-					</Switch>
-				</div>
-			</BrowserRouter>
+			{(this.state.loaded) ? 
+				<BrowserRouter>
+					<div>
+						<Switch>
+							<Route exact path={"/"} render={props => <PatientNav {...props} patientNotFound={false} patientAccounts={this.state.patientAccounts} />} />
+							{this.state.patientAccounts.map((id) => 
+								<Route  key={"p_view_" + id}
+								        exact path={"/" + id}
+									    render={props =>
+									   		<PatientView {...props}
+									   					 patientID={id}
+									   		/>
+									    }
+								/>
+							)}
+							<Route render={props => <PatientNav {...props} patientNotFound={true} patientAccounts={this.state.patientAccounts} />} />
+						</Switch>
+					</div>
+				</BrowserRouter>
+				:
+				<div></div>
+			}
 		</div>
 }

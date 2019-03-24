@@ -14,7 +14,7 @@ export default class extends React.Component {
 			<h1>iCLASS</h1>
 			<ul className="header">
 				{this.props.patientAccounts.map((id) => 
-					<li key={"pat-" + id}><Link to={{pathname: "/patient" + (Number(id) + 1)}}>{"Patient" + id}</Link></li>
+					<li key={"pat-" + id}><Link to={{pathname: "/" + id}}>{id}</Link></li>
 				)}
 			</ul>
 			{(this.props.patientNotFound) ? <div>Patient not found.</div> : <div></div>}

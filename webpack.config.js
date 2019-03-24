@@ -10,10 +10,6 @@ module.exports = [
       path: path.resolve(__dirname),
       filename: 'public/js/index.main.react.js'
     },
-    // devServer: {
-    //   historyApiFallback: true,
-    //   stats: 'errors-only'
-    // },
     devtool: 'none', // 'cheap-eval-source-map',
     module: {
       rules: [
