@@ -2,6 +2,7 @@ import React from 'react';
 import * as d3 from 'd3';
 import * as d3_multi from 'd3-selection-multi';
 import Q from 'q';
+import {Set} from 'immutable';
 import Frac from 'fraction.js';
 import {fromEvent, Subject} from 'rxjs';
 import {debounceTime, bufferCount, map} from 'rxjs/operators';
@@ -28,6 +29,8 @@ export default class extends React.Component {
 		this.minimap_svg = React.createRef();
 		this.minimap_area = React.createRef();
 		
+		this.area_canvas = React.createRef();
+		
 		this.state = {
 			is_annotating: false,
 			annotating_id: null
@@ -44,6 +47,12 @@ export default class extends React.Component {
 		
 		this.$minimap_svg = d3.select(this.minimap_svg.current);
 		this.$minimap_area = d3.select(this.minimap_area.current);
+		
+		this.area_ctx = this.area_canvas.current.getContext('2d');
+		
+		this.area_ctx.moveTo(0, 0);
+		this.area_ctx.strokeStyle = '#000 solid 1px';
+		this.area_ctx.fillStyle = '#000';
 		
 		this.$zoom.on("dblclick.zoom", null);
 		this.$svg.on("dblclick", e => {
@@ -139,7 +148,18 @@ export default class extends React.Component {
 				annot_id={this.props.annot_id}
 			/>
 		}
-		<svg ref={this.svg} width={this.props.width} height={this.props.height}>
+		<div className="plot-container">
+			<canvas
+				className="plot" ref={this.area_canvas}
+				width={this.props.width * window.devicePixelRatio * 10}
+				height={this.props.height * window.devicePixelRatio}
+				style={{
+					width: `${this.props.width * 10}px`,
+					height: `${this.props.height}px`,
+				}}
+			/>
+		</div>
+		<svg className="plot" ref={this.svg} width={this.props.width} height={this.props.height}>
 			<g ref={this.area}></g>
 			<g ref={this.gBrushes} className="brushes"></g>
 			<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} width={this.props.width} height={this.props.height} ref={this.zoom} />
@@ -153,6 +173,8 @@ export default class extends React.Component {
 		// TODO account for initial zooms in props
 		
 		// DATA SETUP //
+		let px_x_shift = 0; // amount of shift of the canvas relative to the starting position, due to wraparounds
+		let visible_set = new Set();
 		const domain1 = [new Date(this.props.dataset_meta.tstart), new Date(this.props.dataset_meta.tstart + 30000)];
 		const data_controller = new DataController(
 			this.props.dataset_meta
@@ -162,7 +184,7 @@ export default class extends React.Component {
 		(() => {
 			this.x = d3.scaleTime()
 			            .range([0, +this.$svg.attr('width')])
-			            .domain(domain1);
+			            .domain(domain1); // TODO: consider replacing with a representation relative to the whole dataset width
 			const x0 = this.x.copy();
 			const y = d3.scaleLinear()
 			            .range([+this.$svg.attr('height'), 0])
@@ -195,22 +217,22 @@ export default class extends React.Component {
 			               	// I think 
 			               	// h_line.attr('d', line);
 			               	const tf = d3.event.transform;
+			               	
 			               	// if has_zoomed is false, the new domain should be the one passed by props
 			               	const new_domain =  tf.rescaleX(x0).domain();//this.props.has_zoomed ? t_domain : this.props.zoom_times;
-			               	zoom_subj.next(new_domain);
-			               	this.x.domain(new_domain);
-			               	h_lines.forEach(h_line => {
-			               		const tf_str = `translate(${tf.x} 0) scale(${tf.k} 1)`;;
-				               	h_line.attr('transform', tf_str); // assuming non-scaling stroke; much better performance
-				               	// this.$gBrushes.attr('transform', tf_str);
-				               	// this.$gBrushes.selectAll('.handle').attr('width', 6/tf.k);
-				               	// h_line.attr('d', line) // without non-scaling stroke, quite wasteful
-			               	}); //Object.assign({}, , { y: 1 }))); // scale only X
-			               	h_x_ax.call(x_ax);
+			               	
+			               	if(new_domain[0] > data_controller.domain0[0] && new_domain[1] < data_controller.domain0[1]) {
+			               		// limit to dataset window
+			               		zoom_subj.next(new_domain);
+			               		this.x.domain(new_domain);
+			               		
+			               		const tf_str = `translate(${tf.x}px, 0) scale(${tf.k}, 1)`;
+			               		this.area_canvas.current.style.transform = tf_str;
+			               		h_x_ax.call(x_ax);
 
-			               	// update brushes through x()
-			               	this.updateBrushes();
-
+			               		// update brushes through x()
+			               		this.updateBrushes();
+			               	}
 			               });
 			
 			this.$zoom.call(this.zoomFunc).on('dblclick.zoom', null);
@@ -219,18 +241,83 @@ export default class extends React.Component {
 			const resampleData = new_domain => {
 				data_controller.maybe_update(new_domain)
 					.then(did_update => {
-						if(did_update) {
+						const enclosing_domain_nums = data_controller.domain_to_numerators(new_domain);
+						const enclosing_domain = data_controller.expand_domain(new_domain);
+						console.log(enclosing_domain_nums);
+						if(visible_set.union(enclosing_domain_nums).size > visible_set.size) {
+							// new visible chunks
+							// condition supercedes `did_update` because now the canvas wraps around and sometimes we need to re-render old data again
+							
 							const data = data_controller.get_data(new_domain);
+							
 							// destroy the boundaries between chunks and use graph interpolate
 							// debugger;
-							for(let i = 0; i < NUM_CH; i++) {
-								// debugger;
-								h_lines[i].attr(
-									'd',
-									line(
-										data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])
-									)
-								);
+							// for(let i = 0; i < NUM_CH; i++) {
+							// 	// debugger;
+							// 	h_lines[i].attr(
+							// 		'd',
+							// 		line(
+							// 			data.map(packet => [packet[0], packet[1][channels[i]] / (NUM_CH + 2) + offset(channels[i])])
+							// 		)
+							// 	);
+							// }
+							
+							const px_w = this.x(enclosing_domain[1]) - this.x(enclosing_domain[0]);
+							const did_wrap_right = this.x(data[0][data[0].length - 1][0]) > this.area_canvas.current.width,
+							      did_wrap_left = this.x(data[0][0][0]) < 0;
+							if(did_wrap_left || did_wrap_right) {
+								// this.buffer_ctx.clearRect(0, 0, this.buffer_area.current.width, this.buffer_area.current.height);
+								if(did_wrap_right) {
+									// wrap around right ; new data will draw off canvas
+									// for now, just assume a single data frame is in view
+									// when using `this.x` to transform the x-shift in time, we assume that `this.x` is a linear scale; if logarithmic or something else funky then we have to convert that time delta to a px delta more carefully
+									
+									px_x_shift = this.x(enclosing_domain[0] - domain1[0]);
+									
+									// this.buffer_ctx.drawImage(
+									// 	this.area_ctx,
+									// 	this.x(enclosing_domain[0]) - px_x_shift, 0, px_w, this.area_canvas.current.height,
+									// 	0, 0, px_w, this.area_canvas.current.height
+									// );
+								}
+								else if(did_wrap_left) {
+									// this.buffer_ctx.drawImage(
+									// 	this.area_ctx,
+									// 	0, 0, px_w, this.area_canvas.current.height,
+									// 	this.x(enclosing_domain[0]) - px_x_shift, 0, px_w, this.area_canvas.current.height
+									// );
+									
+									px_x_shift = this.x(enclosing_domain[1]) - this.area_canvas.current.width;
+								}
+								
+								// this.area_ctx.clearRect(0, 0, this.area_canvas.current.width, this.area_canvas.current.height);
+								// this.area_ctx.drawImage(this.buffer_ctx);
+								
+								// mutate state
+								visible_set = new Set(enclosing_domain_nums);
+								
+								// adjust the positioning of canvas
+								const tf = d3.zoomTransform(this.$zoom.node());
+								this.area_canvas.current.style.transform = `translate(${tf.x - px_x_shift}px, 0) scale(${tf.k}, 1)`;
+							}
+							
+							for(let ch = 0; ch < data[0][1].length; ch++) {
+								let first_point = true;
+								for(const [t, sample] of data) {
+									(first_point ? this.area_ctx.moveTo : this.area_ctx.lineTo).call(
+										this.area_ctx,
+										this.x(t) - px_x_shift, y(sample[ch] / (NUM_CH + 2) + offset(channels[ch]))
+									);
+									if(this.x(t) < 10 && ch === 0 && visible_set.size > 0)
+										console.log(t, this.x(t), y(sample[ch]));
+									
+									first_point = false;
+								}
+								this.area_ctx.stroke();
+							}
+							
+							if(!did_wrap_left && !did_wrap_right) {
+								visible_set = visible_set.union(enclosing_domain_nums);
 							}
 						}
 					}, console.log).catch(console.log)

@@ -36,12 +36,13 @@ export default class {
 		                 .then(dataset => {
 		                 	for(const [chunk_idx, data] of dataset)
 		                 		this.chunks.set(chunk_idx, data);
+		                 	
+		                 	
 		                 	return dataset.length > 0;
 		                 });
 	}
 	
 	get_data(domain) {
-		const lin_zoom = Math.pow(2, this.zoom);
 		return this.domain_to_numerators(domain)
 		           .slice(1)
 		           .filter(chunk_idx => this.chunks.has(chunk_idx))
@@ -54,7 +55,7 @@ export default class {
 			           	           	return acc;
 			           	           }, [])
 			           	           .map((a, i, A) => [
-			           	           	new Date(this.domain0[0].getTime() + this.dataset_meta.point_count / this.dataset_meta.Fs * 1000 / lin_zoom * (chunk_idx - 1 + i / A.length)), // timestamp
+			           	           	this.numerator_to_time(chunk_idx - 1 + i / A.length), // timestamp
 			           	           	a // datum
 			           	           ])
 			         );
@@ -76,5 +77,16 @@ export default class {
 			domain_frac[1].mul(Math.pow(2, this.zoom)).ceil()
 		];
 		return [...Array(bounds[1].valueOf() + 1).keys()].slice(bounds[0].valueOf());
+	}
+	
+	numerator_to_time(num) {
+		const lin_zoom = Math.pow(2, this.zoom);
+		return new Date(this.domain0[0].getTime() + this.dataset_meta.point_count / this.dataset_meta.Fs * 1000 / lin_zoom * num)
+	}
+	
+	expand_domain(domain) {
+		// snap domain to the enclosing set of contiguous bounding boxes
+		const nums = this.domain_to_numerators(domain);
+		return [this.numerator_to_time(nums[0]), this.numerator_to_time(nums[nums.length - 1]) + 1];
 	}
 }

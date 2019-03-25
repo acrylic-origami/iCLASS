@@ -40,7 +40,7 @@ function unflatten(buf, dims, dtype='f', idx=[]) {
 	
 	switch(dims.length - idx.length) {
 		case 1:
-			return new TypedArray(buf.slice(flat_idx * dims[idx.length] * n_bytes, (flat_idx * dims[idx.length] + dims[dims.length - 1]) * n_bytes));
+			return [].slice.call(new TypedArray(buf.slice(flat_idx * dims[idx.length] * n_bytes, (flat_idx * dims[idx.length] + dims[dims.length - 1]) * n_bytes)));
 		// case 2:
 		// 	const chunk = [];
 		// 	bytes_per_slice = n_bytes * dims[dims.length - 1];
