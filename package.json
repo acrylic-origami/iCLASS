@@ -1,8 +1,9 @@
 {
   "name": "iclass",
   "version": "0.0.0",
+  "main": "index.js",
   "scripts": {
-    "build": "webpack --config webpack.config.js",
+    "build": "webpack --config webpack.config.js --watch",
     "watch": "./node_modules/.bin/webpack --watch",
     "start": "node server.js /Users/sasha/Desktop/BCIResearch/EU_DATASET"
   },
@@ -18,6 +19,7 @@
     "immutable": "^4.0.0-rc.12",
     "q": "^1.5.1",
     "react-final-form": "^4.0.2",
+    "react-router-dom": "^5.0.0",
     "rx": "^4.1.0",
     "rx-lite": "^4.0.8",
     "rxjs": "^6.3.3",

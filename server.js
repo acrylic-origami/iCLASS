@@ -1,6 +1,8 @@
 const hdf5 = require('hdf5').hdf5;
 const h5lt = require('hdf5').h5lt;
 const express = require('express');
+const path = require('path');
+const { lstatSync, readdirSync } = require('fs');
 const app = express();
 const Frac = require('fraction.js');
 const { FULL_RES_INTERVAL } = require('./src/consts.js');
@@ -18,6 +20,16 @@ const data = new Map([ // TEMP
 		f_aux, g_aux
 	]]
 ]);
+
+// Fetch directory names in directory 'source'
+const isDirectory = source => lstatSync(source).isDirectory();
+const getDirectories = source =>
+  		readdirSync(source).map(name => path.join(source, name)).filter(isDirectory).map(x => path.win32.basename(x));
+// Fetch .mat file names in directory 'source'
+const isMat = source => path.extname(source).toLowerCase() == '.mat';
+const getMatFiles = source =>
+  		readdirSync(source).map(name => path.join(source, name)).filter(isMat).map(x => path.win32.basename(x));
+
 // app.get('/data', (req, res, next) => {
 // 	if(req.query.annotation != null && (req.query.start == null || req.query.range == null)) {
 // 		req.query.start = 4; // TEMP: to make into promise w/ db call
@@ -162,7 +174,24 @@ app.get('/dataset_meta', (req, res) => {
 		subsamples: unflatten(flat_subsamples_buf.buffer, dims)
 	});
 })
+
+app.get('/get_patients', (req, res) => {
+  	const directories = getDirectories(path.join(__dirname +'/patient_data/'));
+	res.send({patients: directories});
+})
+
+app.get('/get_datasets', (req, res) => {
+  	const datasets = getMatFiles(path.join(__dirname +'/patient_data/' + req.query.patientId));
+	console.log(datasets);
+	res.send({datasets: datasets});
+})
+
 app.use(express.static('public'));
+
+// For react-router
+app.get('*', (req, res) => {
+	res.sendFile(path.join(__dirname + '/public/index.html'));
+})
 
 app.listen(8080);
 // const g = f.openGroup('data');
