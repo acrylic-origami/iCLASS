@@ -7,18 +7,15 @@ const app = express();
 const Frac = require('fraction.js');
 const { FULL_RES_INTERVAL } = require('./src/consts.js');
 
-const f_aux = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_002.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
-const g_aux = f_aux.openGroup('data');
-
-const f = new hdf5.File(`${process.argv[2]}/EDMSE_pat_FR_1096_002.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
-const g = f.openGroup('data');
-const Fs = h5lt.readDataset(g.id, 'Fs');
-const tstart = Date.parse(String.fromCharCode.apply(null, h5lt.readDataset(g.id, 'tstart')).replace('-', ' '));
 const data = new Map([ // TEMP
-	['EDMSE_pat_FR_1096_002.mat', [
-		f, g, Fs[0], tstart,
-		f_aux, g_aux
-	]]
+	// ['EDMSE_pat_FR_1096_002.mat', [
+	// 	f, g, Fs[0], tstart,
+	// 	f_aux, g_aux
+	// ]],
+	// ['EDMSE_pat_FR_1096_050.mat', [
+	// 	f, g, Fs[0], tstart,
+	// 	f_aux, g_aux
+	// ]],
 ]);
 
 // Fetch directory names in directory 'source'
@@ -128,7 +125,7 @@ app.get('/data', (req, res) => {
 	// CONSISTENCY RULE: lower limit is included if equal; upper limit is excluded if equal
 	// expect req.query.zoom, req.query.start_N, req.query.start_D, req.query.end_N, req.query.end_D
 	// also expect (2^-zoom) divides (start - end)
-	const meta = data.get('EDMSE_pat_FR_1096_002.mat');
+	const meta = data.get(req.query.dataset);
 	const dims = meta[0].getDatasetDimensions('/data/signal');
 	
 	const frac_start = new Frac(parseInt(req.query.start_N)).div(parseInt(req.query.start_D));
@@ -147,7 +144,6 @@ app.get('/data', (req, res) => {
 		console.log(int_range.map(v => v.valueOf()), stride);
 		const count = int_range[1].sub(int_range[0]).div(stride).floor();
 		const options = { start: [int_range[0].valueOf(), 0], stride: [1, stride.valueOf()], count: [count.valueOf(), dims[1]]};
-		console.log(options);
 		const flat_data_buf = h5lt.readDatasetAsBuffer(meta[1].id, 'signal', options).buffer;
 		
 		new_chunks.push(unflatten(flat_data_buf, options.count, 'd'));
@@ -158,12 +154,28 @@ app.get('/data', (req, res) => {
 })
 // TODO some redundancy in the data methods: fix later
 app.get('/annotation', (req, res) => {
-	res.send({ dataset: 'EDMSE_pat_FR_1096_002.mat', start: 4, range: 2 });
+	res.send({ dataset: 'EDMSE_pat_FR_1096_050.mat', start: 4, range: 2 });
 })
 
 app.get('/dataset_meta', (req, res) => {
 	// TODO: annotation <-> dataset
-	const meta = data.get('EDMSE_pat_FR_1096_002.mat');
+	
+	if(!data.has(req.query.dataset)) {
+		const f_aux = new hdf5.File(`${process.argv[2]}/${req.query.dataset.substring(0, req.query.dataset.length - 4)}.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
+		const g_aux = f_aux.openGroup('data');
+
+		const f = new hdf5.File(`${process.argv[2]}/${req.query.dataset.substring(0, req.query.dataset.length - 4)}.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
+		const g = f.openGroup('data');
+		const Fs = h5lt.readDataset(g.id, 'Fs');
+		const tstart = Date.parse(String.fromCharCode.apply(null, h5lt.readDataset(g.id, 'tstart')).replace('-', ' '));
+		
+		data.set(req.query.dataset, [
+			f, g, Fs[0], tstart,
+			f_aux, g_aux
+		]);
+	}
+	
+	const meta = data.get(req.query.dataset);
 	const dims = meta[4].getDatasetDimensions('data/subsamples');
 	const flat_subsamples_buf = h5lt.readDatasetAsBuffer(meta[5].id, 'subsamples');
 	console.log(dims);

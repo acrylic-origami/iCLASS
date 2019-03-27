@@ -1,7 +1,7 @@
 import Frac from 'fraction.js';
 import Q from 'q';
 import * as d3 from 'd3'
-import { Map } from 'es6-shim';
+import { Map, Set } from 'es6-shim';
 import { FULL_RES_INTERVAL } from './consts';
 
 export default class {
@@ -9,6 +9,7 @@ export default class {
 		// StampedData := Array<float, Array<float>>
 		this.dataset_meta = dataset_meta;
 		this.chunks = new Map(); // Map<idx: int, StampedData>
+		this.visible_chunks = new Set();
 		this.domain0 = [new Date(dataset_meta.tstart), new Date(dataset_meta.tstart + dataset_meta.point_count / dataset_meta.Fs * 1000)];
 		this.zoom = Math.ceil(Math.log2((this.domain0[1] - this.domain0[0]) / (FULL_RES_INTERVAL * 1000))); // 
 		// this.requestor = requestor; // (zoom: int, start: Frac, end: Frac) => Promise<Array<StampedData>>
@@ -17,50 +18,56 @@ export default class {
 	/* protected */
 	request = (zoom, start, end) => d3.json(`data?dataset=${this.dataset_meta.dataset}&zoom=${zoom}&start_N=${start.n}&start_D=${start.d}&end_N=${end.n}&end_D=${end.d}`);
 	
-	maybe_update(domain) {
+	/* protected */
+	fetch_new_data(domain) {
 		const new_chunks = this.domain_to_numerators(domain)
-		                       .slice(1)
 		                       .filter(v => !this.chunks.has(v));
 		// console.log(new_chunks, domain);
 		return new_chunks.reduce((acc, next_chunk, i) => acc.then(dataset => {
 			const denom_zoom = Math.pow(2, this.zoom);
 			return this.request(
 				this.zoom,
-				new Frac(next_chunk - 1).div(denom_zoom),
-				new Frac(next_chunk).div(denom_zoom)
+				new Frac(next_chunk).div(denom_zoom),
+				new Frac(next_chunk + 1).div(denom_zoom)
 			).then(data => {
 				dataset.push([next_chunk, data]);
 				return dataset;
 			});
 		}), Q([]))
-		                 .then(dataset => {
-		                 	for(const [chunk_idx, data] of dataset)
-		                 		this.chunks.set(chunk_idx, data);
-		                 	
-		                 	
-		                 	return dataset.length > 0;
-		                 });
+		.then(dataset => {
+			for(const [chunk_idx, data] of dataset)
+				this.chunks.set(chunk_idx, data);
+			
+			
+			return dataset.length > 0;
+		});
+	}
+	
+	clear_visible() {
+		this.visible_chunks.clear();
 	}
 	
 	get_data(domain) {
-		return this.domain_to_numerators(domain)
-		           .slice(1)
-		           .filter(chunk_idx => this.chunks.has(chunk_idx))
-		           .reduce((acc, chunk_idx) => {
-		           	acc.push.apply(
-		           		acc, 
-			           	this.chunks.get(chunk_idx)
-			           	           .reduce((acc, a) => {
-			           	           	acc.push.apply(acc, a);
-			           	           	return acc;
-			           	           }, [])
-			           	           .map((a, i, A) => [
-			           	           	this.numerator_to_time(chunk_idx - 1 + i / A.length), // timestamp
-			           	           	a // datum
-			           	           ])
-			         );
-			         return acc;
-		           }, []);
+		return this.fetch_new_data(domain).then(_ => {
+			const new_idxs = this.domain_to_numerators(domain)
+			                     .filter(chunk_idx => !this.visible_chunks.has(chunk_idx));
+			// console.log(new_idxs);
+			const ret = new_idxs.map(chunk_idx =>
+				this.chunks.get(chunk_idx)
+					.reduce((acc, a) => { // flatten server chunks
+						acc.push.apply(acc, a);
+						return acc;
+					}, [])
+					.map((a, i, A) => [
+						this.numerator_to_time(chunk_idx + i / A.length), // timestamp
+						a // datum
+					])
+			);
+			for(const idx of new_idxs)
+				this.visible_chunks.add(idx);
+			return ret;
+		});
+		
 	}
 	
 	/* protected */
