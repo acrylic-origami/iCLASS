@@ -6,6 +6,11 @@ const { lstatSync, readdirSync } = require('fs');
 const app = express();
 const Frac = require('fraction.js');
 const { FULL_RES_INTERVAL } = require('./src/consts.js');
+var bodyParser = require("body-parser");
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+
+const ann_server = require('./annotation_server.js');
 
 const data = new Map([ // TEMP
 	// ['EDMSE_pat_FR_1096_002.mat', [
@@ -199,6 +204,17 @@ app.get('/get_datasets', (req, res) => {
 })
 
 app.use(express.static('public'));
+
+app.get('/load_annotations', (req, res) => {
+	const results = ann_server.loadAnnotations().then((results) => {
+		res.send({ results: results});
+	});
+})
+
+app.post('/save_annotations', (req, res) => {
+	ann_server.annotToCSV(req.body);
+	res.send({success: true});
+})
 
 // For react-router
 app.get('*', (req, res) => {
