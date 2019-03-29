@@ -1,9 +1,13 @@
+const path = require('path');
+const csv = require('csv-parser');  
+const fs = require('fs');
+const createCsvWriter = require('csv-writer').createObjectCsvWriter;  
+
 module.exports = {
   annotToCSV: (annotations) => {
-    const createCsvWriter = require('csv-writer').createObjectCsvWriter;  
-	
+
 	const csvWriter = createCsvWriter({  
-	  path: 'out.csv',
+	  path: path.join(__dirname +'/patient_data/' + patientId + '/' + patientId + '_annotations.csv'),
 	  header: [
 	    {id: 'type', title: 'type'},
 	    {id: 'startTime', title: 'startTime'},
@@ -15,16 +19,13 @@ module.exports = {
 	  .writeRecords(annotations)
 	  .then(()=> console.log('The CSV file was written successfully'));
   },
-  loadAnnotations: () => {
+  loadAnnotations: (patientId, dataset) => {
     return new Promise(resolve => {
-    	const csv = require('csv-parser');  
-		const fs = require('fs');
-
 		console.log('loadAnnotations');
 
 		const results = [];
 
-		fs.createReadStream('out.csv')  
+		fs.createReadStream(path.join(__dirname +'/patient_data/' + patientId + '/' + patientId + '_annotations.csv'))
 		  .pipe(csv())
 		  .on('data', (row) => {
 		  	console.log('push row');

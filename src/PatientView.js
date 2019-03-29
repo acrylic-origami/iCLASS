@@ -7,6 +7,7 @@ import * as d3 from 'd3';
 import * as d3_multi from 'd3-selection-multi';
 import Q from 'q';
 import DatasetView from './DatasetView';
+import PatientMinimap from './PatientMinimap'
 
 export default class extends React.Component {
 	constructor(props) {
@@ -44,8 +45,7 @@ export default class extends React.Component {
 	componentDidMount() {
 		// Load datasets in this patient directory
 		const D_initial = (() => {
-			if (true) return d3.json(`/get_datasets?patientId=` + this.props.patientID); // call get patients
-			else return Q.fcall(() => { throw new Exception(); });
+			return d3.json(`/get_datasets?patientId=` + this.props.patientID); // call get patients
 		})();
 		D_initial.then(results => {
 			if(document.readyState === 'complete') {
@@ -64,6 +64,7 @@ export default class extends React.Component {
 			}
 		}, e => {
 			// retry or show dataset selection screen
+			console.log('Unable to load datasets');
 		});
 	}
 
@@ -79,10 +80,19 @@ export default class extends React.Component {
 							<h1>{this.props.patientID}</h1>
 							<Link to={"/"}>back</Link>
 							<ul className="header">
-								{this.state.datasets.map((id) => 
-									<li key={"data-" + id}><Link to={{search: "?dataset=" + id}}>{id}</Link></li>
+								{this.state.datasets.map((dataset, index) => 
+									<li key={"data-" + index}><Link to={{search: "?dataset=" + dataset.title}}>{dataset.title}</Link>
+										<ul>
+											<li key={"startend-" + index}>{(new Date(dataset.start)).toString() + " - " +
+													(new Date(dataset.end)).toString()}</li>
+										</ul>
+									</li>
 								)}
 							</ul>
+							<PatientMinimap datasets={this.state.datasets}
+											width={960}
+											height={100}
+							/>
 						</div>
 						:
 						<div></div>

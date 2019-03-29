@@ -11,7 +11,16 @@ export default class extends React.Component {
 			is_editing: false,
 			annotation_idx: 0,
 			annotations: new Map(),
-			annotating_id: null
+			annotating_id: null,
+			test_annotations: [{type: "onset",
+								startTime: new Date("2018-06-05T01:55:52.008Z"),
+								notes: ""},
+								{type: "offset",
+								startTime: new Date("2018-06-05T01:55:52.014Z"),
+								notes: ""},
+								{type: "onset",
+								startTime: new Date("2018-06-05T01:55:52.018Z"),
+								notes: ""}]
 		};
 	}
 	

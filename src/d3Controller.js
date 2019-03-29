@@ -5,6 +5,7 @@ import Q from 'q';
 import Frac from 'fraction.js';
 import {fromEvent, Subject} from 'rxjs';
 import {debounceTime, bufferCount, map} from 'rxjs/operators';
+import AnnotateView from './AnnotateView';
 
 // import DataController from './DataController';
 import DataController from './FlatData';

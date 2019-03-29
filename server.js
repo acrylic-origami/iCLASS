@@ -10,6 +10,7 @@ var bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
+
 const ann_server = require('./annotation_server.js');
 
 const data = new Map([ // TEMP
@@ -42,6 +43,21 @@ const getMatFiles = source =>
 // 		next();
 // 	}
 // });
+
+function add_dataset(dataset) {
+	const f_aux = new hdf5.File(`${process.argv[2]}/${dataset.substring(0, dataset.length - 4)}.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
+	const g_aux = f_aux.openGroup('data');
+
+	const f = new hdf5.File(`${process.argv[2]}/${dataset.substring(0, dataset.length - 4)}.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
+	const g = f.openGroup('data');
+	const Fs = h5lt.readDataset(g.id, 'Fs');
+	const tstart = Date.parse(String.fromCharCode.apply(null, h5lt.readDataset(g.id, 'tstart')).replace('-', ' '));
+	
+	data.set(dataset, [
+		f, g, Fs[0], tstart,
+		f_aux, g_aux
+	]);
+}
 
 function unflatten(buf, dims, dtype='f', idx=[]) {
 	const TypedArray = dtype === 'f' ? Float32Array : Float64Array;
@@ -165,20 +181,7 @@ app.get('/annotation', (req, res) => {
 app.get('/dataset_meta', (req, res) => {
 	// TODO: annotation <-> dataset
 	
-	if(!data.has(req.query.dataset)) {
-		const f_aux = new hdf5.File(`${process.argv[2]}/${req.query.dataset.substring(0, req.query.dataset.length - 4)}.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
-		const g_aux = f_aux.openGroup('data');
-
-		const f = new hdf5.File(`${process.argv[2]}/${req.query.dataset.substring(0, req.query.dataset.length - 4)}.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
-		const g = f.openGroup('data');
-		const Fs = h5lt.readDataset(g.id, 'Fs');
-		const tstart = Date.parse(String.fromCharCode.apply(null, h5lt.readDataset(g.id, 'tstart')).replace('-', ' '));
-		
-		data.set(req.query.dataset, [
-			f, g, Fs[0], tstart,
-			f_aux, g_aux
-		]);
-	}
+	if(!data.has(req.query.dataset)) add_dataset(req.query.dataset);
 	
 	const meta = data.get(req.query.dataset);
 	const dims = meta[4].getDatasetDimensions('data/subsamples');
@@ -199,20 +202,33 @@ app.get('/get_patients', (req, res) => {
 
 app.get('/get_datasets', (req, res) => {
   	const datasets = getMatFiles(path.join(__dirname +'/patient_data/' + req.query.patientId));
-	console.log(datasets);
-	res.send({datasets: datasets});
+	datasets.map((dataset, index) => {
+		if(!data.has(dataset)) add_dataset(dataset);
+		
+		const meta = data.get(dataset);
+
+		datasets[index] = {
+			title: datasets[index],
+			start: meta[3], // tstart
+			end: meta[3] + (meta[0].getDatasetDimensions('/data/signal')[0])*(1000/meta[2]) // point_count * (1000/Fs)
+		};
+
+		if(index == datasets.length - 1) {
+			res.send({datasets: datasets});
+		}
+	});
 })
 
 app.use(express.static('public'));
 
 app.get('/load_annotations', (req, res) => {
-	const results = ann_server.loadAnnotations().then((results) => {
+	const results = ann_server.loadAnnotations(req.query.patientId, req.query.dataset).then((results) => {
 		res.send({ results: results});
 	});
 })
 
 app.post('/save_annotations', (req, res) => {
-	ann_server.annotToCSV(req.body);
+	ann_server.annotToCSV(req.body.patient, req.body.dataset, req.body.annotations);
 	res.send({success: true});
 })
 

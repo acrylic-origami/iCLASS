@@ -93,7 +93,7 @@ export default class extends React.Component {
 			</div>
 			<Form
       			onSubmit={this.onSubmit}
-      			initialValues={{ startTimeString: , type: data_name(this.props.annotation) || 'onset', notes: (this.props.annotation != null && this.props.annotation.notes) || '' }}
+      			initialValues={{ startTimeString: "", type: data_name(this.props.annotation) || 'onset', notes: (this.props.annotation != null && this.props.annotation.notes) || '' }}
       			render={({ onSubmit, reset, form, submitting, pristine, values }) => (
       				<form onSubmit={onSubmit}
       						 style={this.formStyle}>
