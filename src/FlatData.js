@@ -12,6 +12,7 @@ export default class {
 		this.visible_chunks = new Set();
 		this.domain0 = [new Date(dataset_meta.tstart), new Date(dataset_meta.tstart + dataset_meta.point_count / dataset_meta.Fs * 1000)];
 		this.zoom = Math.ceil(Math.log2((this.domain0[1] - this.domain0[0]) / (FULL_RES_INTERVAL * 1000))); // 
+		console.log(this.domain0, this.zoom);
 		// this.requestor = requestor; // (zoom: int, start: Frac, end: Frac) => Promise<Array<StampedData>>
 	}
 	
@@ -20,7 +21,7 @@ export default class {
 	
 	/* protected */
 	fetch_new_data(domain) {
-		const new_chunks = this.domain_to_numerators(domain)
+		const new_chunks = this.domain_to_loose_numerators(domain)
 		                       .filter(v => !this.chunks.has(v));
 		// console.log(new_chunks, domain);
 		return new_chunks.reduce((acc, next_chunk, i) => acc.then(dataset => {
@@ -49,9 +50,9 @@ export default class {
 	
 	get_data(domain) {
 		return this.fetch_new_data(domain).then(_ => {
-			const new_idxs = this.domain_to_numerators(domain)
-			                     .filter(chunk_idx => !this.visible_chunks.has(chunk_idx));
-			// console.log(new_idxs);
+			const nums = this.domain_to_loose_numerators(domain);
+			const new_idxs = nums.filter(chunk_idx => !this.visible_chunks.has(chunk_idx));
+			console.log(domain, nums, this.visible_chunks);
 			const ret = new_idxs.map(chunk_idx =>
 				this.chunks.get(chunk_idx)
 					.reduce((acc, a) => { // flatten server chunks
@@ -70,6 +71,16 @@ export default class {
 		
 	}
 	
+	domain_to_loose_numerators(domain) {
+		// slightly overzealous loading
+		const nums = this.domain_to_numerators(domain);
+		if(nums[0] > 0)
+			nums.unshift(nums[0] - 1);
+		
+		nums.push(nums[nums.length - 1] + 1);
+		return nums;
+	}
+	
 	/* protected */
 	domain_to_numerators(domain) {
 		const domain_frac = [
@@ -83,7 +94,11 @@ export default class {
 			domain_frac[0].mul(Math.pow(2, this.zoom)).floor(),
 			domain_frac[1].mul(Math.pow(2, this.zoom)).ceil()
 		];
-		return [...Array(bounds[1].valueOf() + 1).keys()].slice(bounds[0].valueOf());
+		const ret = [];
+		for(let i = bounds[0].valueOf(); i < bounds[1].valueOf(); i++)
+			ret.push(i);
+		
+		return ret;
 	}
 	
 	numerator_to_time(num) {
@@ -94,6 +109,6 @@ export default class {
 	expand_domain(domain) {
 		// snap domain to the enclosing set of contiguous bounding boxes
 		const nums = this.domain_to_numerators(domain);
-		return [this.numerator_to_time(nums[0]), this.numerator_to_time(nums[nums.length - 1]) + 1];
+		return [this.numerator_to_time(nums[0]), this.numerator_to_time(nums[nums.length - 1] + 1)];
 	}
 }

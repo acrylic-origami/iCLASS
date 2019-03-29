@@ -128,8 +128,12 @@ app.get('/data', (req, res) => {
 	const meta = data.get(req.query.dataset);
 	const dims = meta[0].getDatasetDimensions('/data/signal');
 	
-	const frac_start = new Frac(parseInt(req.query.start_N)).div(parseInt(req.query.start_D));
-	const frac_end = new Frac(parseInt(req.query.end_N)).div(parseInt(req.query.end_D));
+	const frac_start = (parseInt(req.query.start_N) * parseInt(req.query.start_D) > 0) ? 
+		new Frac(parseInt(req.query.start_N)).div(parseInt(req.query.start_D)) :
+		new Frac(0);
+	const frac_end = parseInt(req.query.end_N) <= parseInt(req.query.end_D) ?
+		new Frac(parseInt(req.query.end_N)).div(parseInt(req.query.end_D)) :
+		new Frac(1);
 	const inc = new Frac(1).div((1 << parseInt(req.query.zoom)));
 	const new_chunks = [];
 	for(let running_end = frac_start.add(inc); running_end.compare(frac_end) <= 0; running_end = running_end.add(inc)) {
@@ -178,7 +182,6 @@ app.get('/dataset_meta', (req, res) => {
 	const meta = data.get(req.query.dataset);
 	const dims = meta[4].getDatasetDimensions('data/subsamples');
 	const flat_subsamples_buf = h5lt.readDatasetAsBuffer(meta[5].id, 'subsamples');
-	console.log(dims);
 	res.send({
 		point_count: meta[0].getDatasetDimensions('/data/signal')[0],
 		Fs: meta[2],
