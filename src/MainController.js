@@ -9,6 +9,7 @@ export default class extends React.Component {
 		super(props); // props: initial: [dataset, [start, range]]
 		this.state = {
 			is_editing: false,
+			d3_tf: null,
 			annotation_idx: 0,
 			annotations: new Map(),
 			annotating_id: null
@@ -102,8 +103,10 @@ export default class extends React.Component {
 	};
 	
 	onAnnotationUpdate = annotation => this.setState(state_ => ({
-		annotations: state_.has(state_.annotations.set())
+		annotations: state_.has(state_.annotations.set()) // TODO
 	}));
+	
+	onZoom = tf => this.setState({ d3_tf: tf });
 	
 	render = () => <div>
 		<div className="d3wrap">
@@ -114,6 +117,8 @@ export default class extends React.Component {
 				annotating_id={this.state.annotating_id}
 				onAnnotate={this.onAnnotate}
 				onNewAnnotation={this.onNewAnnotation}
+				tf={this.state.d3_tf}
+				onZoom={this.onZoom}
 				width={960}
 				height={640}
 				/>

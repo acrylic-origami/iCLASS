@@ -11,7 +11,7 @@ export default class {
 		this.chunks = new Map(); // Map<idx: int, StampedData>
 		this.visible_chunks = new Set();
 		this.domain0 = [new Date(dataset_meta.tstart), new Date(dataset_meta.tstart + dataset_meta.point_count / dataset_meta.Fs * 1000)];
-		this.zoom = Math.ceil(Math.log2((this.domain0[1] - this.domain0[0]) / (FULL_RES_INTERVAL * 1000))); // 
+		this.zoom = Math.ceil(Math.log2((this.domain0[1] - this.domain0[0]) / (30 * 1000))); // FULL_RES_INTERVAL
 		console.log(this.domain0, this.zoom);
 		// this.requestor = requestor; // (zoom: int, start: Frac, end: Frac) => Promise<Array<StampedData>>
 	}

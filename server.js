@@ -145,9 +145,9 @@ app.get('/data', (req, res) => {
 		
 		let maybe_stride = int_range[1].sub(int_range[0]).div((FULL_RES_INTERVAL * meta[2])).floor();
 		const stride = maybe_stride.compare(1) < 0 ? 1 : maybe_stride.valueOf();
-		console.log(int_range.map(v => v.valueOf()), stride);
 		const count = int_range[1].sub(int_range[0]).div(stride).floor();
-		const options = { start: [int_range[0].valueOf(), 0], stride: [1, stride.valueOf()], count: [count.valueOf(), dims[1]]};
+		console.log(int_range.map(v => v.valueOf()), stride, count.valueOf());
+		const options = { start: [int_range[0].valueOf(), 0], stride: [stride.valueOf(), 1], count: [count.valueOf(), dims[1]]};
 		const flat_data_buf = h5lt.readDatasetAsBuffer(meta[1].id, 'signal', options).buffer;
 		
 		new_chunks.push(unflatten(flat_data_buf, options.count, 'd'));

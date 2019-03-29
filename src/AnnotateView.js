@@ -5,7 +5,7 @@ import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './A
 
 export default class extends React.Component {
 	constructor(props) {
-		super(props); // props: initial: [dataset, [start, range]]
+		super(props);
 
 		this.state = {
 			startPlaceholder: "",
@@ -87,52 +87,58 @@ export default class extends React.Component {
 	}
 
 	render = () =>
-		<div>
-			<div style={this.titleStyle}>
-				{(this.props.annotation == null) ? 'New' : 'Edit'} Annotation
+		<div className='annotation-edit'>
+			<div className='annotationBar' style={{ left: `${this.props.left_px}px` }}></div>
+			<div className="annotation-menu" style={{ left: `${this.props.left_px}px` }}>
+				<div>
+					<div style={this.titleStyle}>
+						{(this.props.annotation == null) ? 'New' : 'Edit'} Annotation
+					</div>
+					<Form
+		      			onSubmit={this.onSubmit}
+		      			initialValues={{ startTimeString: (this.props.annotation ? this.props.annotation.get_start() : this.props.startTime).toLocaleTimeString('en-GB'), type: this.props.annotation ? data_name(this.props.annotation) : 'onset', notes: (this.props.annotation != null && this.props.annotation.notes) || '' }}
+		      			render={({ onSubmit, reset, form, submitting, pristine, values }) => (
+		      				<form onSubmit={onSubmit}
+		      						 style={this.formStyle}>
+		          				<div style={this.sectionStyle}>
+		            				<div><label>Type</label></div>
+		            				<Field name="type" component="select">
+		              					<option value="onset">Seizure Onset</option>
+		              					<option value="offset">Seizure Offset</option>
+		              					<option value="point">Patient Event</option>
+		            				</Field>
+		          				</div>
+		          				<Field name="startTimeString" validate={this.mustBeTime}>
+		            				{({ input, meta }) => (
+		            					<div style={this.sectionStyle}>
+		                					<div><label>Time</label></div>
+		               						<input {...input} type="text" placeholder="HH:MM:SS:MM" style={this.inputStyle} />
+		                						{meta.error && meta.touched && <span style={this.errorStyle}>{meta.error}</span>}
+		              					</div>
+		            				)}
+		          				</Field>
+		      					<div style={this.sectionStyle}>
+		            				<div><label>Notes</label></div>
+		            				<Field name="notes" component="textarea" placeholder="Notes" style={this.inputStyle} />
+		          				</div>
+		      					<div className="buttons" style={this.buttonWrapStyle}>
+		            				<button type="submit" disabled={submitting} style={this.buttonStyle}>
+		             					Save
+		            				</button>
+		           					<button
+		              					type="button"
+		             					onClick={this.props.onCancel}
+		              					disabled={submitting}
+		              					style={this.buttonStyle}
+		            				>
+		              					Cancel
+		           					</button>
+		          				</div>
+		      				</form>
+		      			)}
+		      		/>
+				</div>
 			</div>
-			<Form
-      			onSubmit={this.onSubmit}
-      			initialValues={{ startTimeString: this.props.start, type: data_name(this.props.annotation) || 'onset', notes: (this.props.annotation != null && this.props.annotation.notes) || '' }}
-      			render={({ onSubmit, reset, form, submitting, pristine, values }) => (
-      				<form onSubmit={onSubmit}
-      						 style={this.formStyle}>
-          				<div style={this.sectionStyle}>
-            				<div><label>Type</label></div>
-            				<Field name="type" component="select">
-              					<option value="onset">Seizure Onset</option>
-              					<option value="offset">Seizure Offset</option>
-              					<option value="point">Patient Event</option>
-            				</Field>
-          				</div>
-          				<Field name="startTimeString" validate={this.mustBeTime}>
-            				{({ input, meta }) => (
-            					<div style={this.sectionStyle}>
-                					<div><label>Time</label></div>
-               						<input {...input} type="text" placeholder="HH:MM:SS:MM" style={this.inputStyle} />
-                						{meta.error && meta.touched && <span style={this.errorStyle}>{meta.error}</span>}
-              					</div>
-            				)}
-          				</Field>
-      					<div style={this.sectionStyle}>
-            				<div><label>Notes</label></div>
-            				<Field name="notes" component="textarea" placeholder="Notes" style={this.inputStyle} />
-          				</div>
-      					<div className="buttons" style={this.buttonWrapStyle}>
-            				<button type="submit" disabled={submitting} style={this.buttonStyle}>
-             					Save
-            				</button>
-           					<button
-              					type="button"
-             					onClick={this.props.handleCancel}
-              					disabled={submitting}
-              					style={this.buttonStyle}
-            				>
-              					Cancel
-           					</button>
-          				</div>
-      				</form>
-      			)}
-      		/>
+			<div className="annotation-overlay" onClick={this.props.onCancel}></div>
 		</div>
 }
