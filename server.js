@@ -214,7 +214,14 @@ app.get('/get_datasets', (req, res) => {
 		};
 
 		if(index == datasets.length - 1) {
-			res.send({datasets: datasets});
+			datasets.sort((a, b) => {
+			  return a.start - b.start;
+			});
+			res.send({
+				datasets: datasets,
+				min_start: datasets[0].start,
+				max_end: Math.max.apply(Math, datasets.map(o => o.end))
+			});
 		}
 	});
 })

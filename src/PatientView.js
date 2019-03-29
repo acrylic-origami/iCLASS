@@ -6,6 +6,7 @@ import { Route,
 import * as d3 from 'd3';
 import * as d3_multi from 'd3-selection-multi';
 import Q from 'q';
+import * as dateFormat from 'dateFormat';
 import DatasetView from './DatasetView';
 import PatientMinimap from './PatientMinimap'
 
@@ -16,6 +17,8 @@ export default class extends React.Component {
 		this.state = {
 			maybe_dataset: null,
 			datasets: [],
+			min_start: 0,
+			max_end: 0,
 			loaded: false
 		};
 	}
@@ -51,14 +54,18 @@ export default class extends React.Component {
 			if(document.readyState === 'complete') {
 				this.setState(state_ => ({
 					datasets: results.datasets,
-					loaded: true
+					loaded: true,
+					min_start: results.min_start,
+					max_end: results.max_end
 				}));
 			}
 			else {
 				window.addEventListener('load', () => {
 					this.setState(state_ => ({
 						datasets: results.datasets,
-						loaded: true
+						loaded: true,
+						min_start: results.min_start,
+						max_end: results.max_end
 					}));
 				});
 			}
@@ -83,13 +90,15 @@ export default class extends React.Component {
 								{this.state.datasets.map((dataset, index) => 
 									<li key={"data-" + index}><Link to={{search: "?dataset=" + dataset.title}}>{dataset.title}</Link>
 										<ul>
-											<li key={"startend-" + index}>{(new Date(dataset.start)).toString() + " - " +
-													(new Date(dataset.end)).toString()}</li>
+											<li key={"startend-" + index}>{dateFormat(new Date(dataset.start), "dddd, mmmm dS, yyyy, h:MM:ss TT") + " - " +
+													dateFormat(new Date(dataset.end), "dddd, mmmm dS, yyyy, h:MM:ss TT")}</li>
 										</ul>
 									</li>
 								)}
 							</ul>
 							<PatientMinimap datasets={this.state.datasets}
+											min_start={this.state.min_start}
+											max_end={this.state.max_end}
 											width={960}
 											height={100}
 							/>
