@@ -22,6 +22,60 @@ export default class extends React.Component {
 			cover: 0,
 			loaded: false
 		};
+
+		this.listWrapStyle = {
+			marginTop: "20px",
+			marginBottom: "20px"
+		};
+
+		this.datasetWrapStyle = {
+			width: '960px',
+			position: 'relative',
+			height: '50px',
+			marginTop: '-1px'
+		};
+
+		this.linkWrapStyle = {
+			position: 'absolute',
+			left: '30px',
+			lineHeight: '50px',
+		};
+
+		this.timeWrapStyle = {
+			position: 'absolute',
+			right: '0',
+			height: '50px'
+		}
+
+		this.startWrapStyle = {
+			display: 'inline-block',
+			width: '150px',
+			lineHeight: '50px',
+		}
+
+		this.endWrapStyle = {
+			display: 'inline-block',
+			width: '150px',
+			lineHeight: '50px',
+		}
+
+		this.dateWrapStyle = {
+			display: 'inline-block',
+			width: '150px',
+			lineHeight: '50px'
+		}
+
+		this.completenessStyle = {
+			fontSize: '18px',
+			// marginLeft: '30px',
+			marginBottom: '20px',
+			width: '960px',
+			textAlign: 'center'
+		}
+
+		this.patientTitleStyle = {
+			marginLeft: "30px"
+		}
 	}
 
 	// Render the patient selection of no search id is set
@@ -87,20 +141,46 @@ export default class extends React.Component {
 				<div>
 					{(this.state.loaded) ?
 						<div>
-							<h1>{this.props.patientID}</h1>
 							<Link to={"/"}>back</Link>
-							<ul className="header">
+							<h1 style={this.patientTitleStyle}>{this.props.patientID}</h1>
+							<div style={this.listWrapStyle}>
+								<div style={{...this.datasetWrapStyle, color: 'grey'}}>
+									<div style={this.linkWrapStyle}>
+										Dataset:
+									</div>
+									<div style={this.timeWrapStyle}>
+										<div style={this.startWrapStyle}>
+											Start: 
+										</div>
+										<div style={this.endWrapStyle}>
+											End:
+										</div>
+										<div style={this.dateWrapStyle}>
+											Date: 
+										</div>
+									</div>
+								</div>
 								{this.state.datasets.map((dataset, index) => 
-									<li key={"data-" + index}><Link to={{search: "?dataset=" + dataset.title}}>{dataset.title}</Link>
-										<ul>
-											<li key={"startend-" + index}>{dateFormat(new Date(dataset.start), "dddd, mmmm dS, yyyy, h:MM:ss TT") + " - " +
-													dateFormat(new Date(dataset.end), "dddd, mmmm dS, yyyy, h:MM:ss TT")}</li>
-										</ul>
-									</li>
+									<div key={"data-" + index} style={this.datasetWrapStyle}>
+										<div style={this.linkWrapStyle}>
+											<Link to={{search: "?dataset=" + dataset.title}}>{dataset.title}</Link>
+										</div>
+										<div style={this.timeWrapStyle}>
+											<div style={this.startWrapStyle}>
+												{dateFormat(new Date(dataset.start), "hh:MM:ss TT")} 
+											</div>
+											<div style={this.endWrapStyle}>
+												{dateFormat(new Date(dataset.end), "hh:MM:ss TT")}
+											</div>
+											<div style={this.dateWrapStyle}>
+												{dateFormat(new Date(dataset.start), "mmmm dS, yyyy")} 
+											</div>
+										</div>
+									</div>
 								)}
-							</ul>
-							<div>
-								Dataset completion: {(this.state.cover * 100).toFixed(2) + "%"}
+							</div>
+							<div style={this.completenessStyle}>
+								Dataset completeness: {(this.state.cover * 100).toFixed(2) + "%"}
 							</div>
 							<PatientMinimap datasets={this.state.datasets}
 											min_start={this.state.min_start}
