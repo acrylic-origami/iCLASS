@@ -107,6 +107,10 @@ export default class extends React.Component {
 											max_end={this.state.max_end}
 											width={960}
 											height={100}
+											brush_t={{
+												start: 0, //this.state.min_start + 0.2 * (this.state.max_end - this.state.min_start),
+												end: 0 //this.state.max_end - 0.2 * (this.state.max_end - this.state.min_start)
+											}}
 							/>
 						</div>
 						:
