@@ -33,17 +33,6 @@ const isMat = source => path.extname(source).toLowerCase() == '.mat';
 const getMatFiles = source =>
   		readdirSync(source).map(name => path.join(source, name)).filter(isMat).map(x => path.win32.basename(x));
 
-// app.get('/data', (req, res, next) => {
-// 	if(req.query.annotation != null && (req.query.start == null || req.query.range == null)) {
-// 		req.query.start = 4; // TEMP: to make into promise w/ db call
-// 		req.query.range = 2;
-// 		next();
-// 	}
-// 	else {
-// 		next();
-// 	}
-// });
-
 function add_dataset(dataset) {
 	const f_aux = new hdf5.File(`${process.argv[2]}/${dataset.substring(0, dataset.length - 4)}.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
 	const g_aux = f_aux.openGroup('data');
@@ -202,6 +191,8 @@ app.get('/get_patients', (req, res) => {
 
 app.get('/get_datasets', (req, res) => {
   	const datasets = getMatFiles(path.join(__dirname +'/patient_data/' + req.query.patientId));
+	var previous_time = 0;
+	var time_covered = 0;
 	datasets.map((dataset, index) => {
 		if(!data.has(dataset)) add_dataset(dataset);
 		
@@ -209,9 +200,12 @@ app.get('/get_datasets', (req, res) => {
 
 		datasets[index] = {
 			title: datasets[index],
-			start: meta[3], // tstart
-			end: meta[3] + (meta[0].getDatasetDimensions('/data/signal')[0])*(1000/meta[2]) // point_count * (1000/Fs)
+			start:  previous_time + meta[3], // tstart
+			end: previous_time + meta[3] + (meta[0].getDatasetDimensions('/data/signal')[0])*(1000/meta[2]) // point_count * (1000/Fs)
 		};
+
+		previous_time += ((index == 1) ? 2 : 1) * (datasets[index].end - datasets[index].start);
+		time_covered += (datasets[index].end - datasets[index].start);
 
 		if(index == datasets.length - 1) {
 			datasets.sort((a, b) => {
@@ -220,7 +214,8 @@ app.get('/get_datasets', (req, res) => {
 			res.send({
 				datasets: datasets,
 				min_start: datasets[0].start,
-				max_end: Math.max.apply(Math, datasets.map(o => o.end))
+				max_end: Math.max.apply(Math, datasets.map(o => o.end)),
+				cover: time_covered/(Math.max.apply(Math, datasets.map(o => o.end)) - datasets[0].start)
 			});
 		}
 	});

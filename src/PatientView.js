@@ -19,6 +19,7 @@ export default class extends React.Component {
 			datasets: [],
 			min_start: 0,
 			max_end: 0,
+			cover: 0,
 			loaded: false
 		};
 	}
@@ -56,7 +57,8 @@ export default class extends React.Component {
 					datasets: results.datasets,
 					loaded: true,
 					min_start: results.min_start,
-					max_end: results.max_end
+					max_end: results.max_end,
+					cover: results.cover
 				}));
 			}
 			else {
@@ -65,7 +67,8 @@ export default class extends React.Component {
 						datasets: results.datasets,
 						loaded: true,
 						min_start: results.min_start,
-						max_end: results.max_end
+						max_end: results.max_end,
+						cover: results.cover
 					}));
 				});
 			}
@@ -96,6 +99,9 @@ export default class extends React.Component {
 									</li>
 								)}
 							</ul>
+							<div>
+								Dataset completion: {(this.state.cover * 100).toFixed(2) + "%"}
+							</div>
 							<PatientMinimap datasets={this.state.datasets}
 											min_start={this.state.min_start}
 											max_end={this.state.max_end}

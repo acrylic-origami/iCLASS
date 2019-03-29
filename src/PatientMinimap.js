@@ -56,7 +56,6 @@ export default class extends React.Component {
 			                  .enter()
 			                  .append('rect')
 			                  .each(function (d, i) {
-			                  	console.log('rect');
 			                  	d3.select(this).attrs({
 				                  	'class': 'd_minimap-chart-ele',
 				                  	'x': x(new Date(d.start)),
@@ -65,7 +64,7 @@ export default class extends React.Component {
 				                  	'height': that.props.height,
 				                  	'fill': 'green'
 				                  })
-			                  	  .style("opacity", 0.3)
+			                  	  .style("opacity", 0.5)
 			                  });
 
 			const text_selection = this.$d_minimap_text_area.selectAll('text')
@@ -73,8 +72,6 @@ export default class extends React.Component {
 			                  .enter();
 			text_selection.append('text')
 			              .each(function (d, i) {
-			                  	console.log('were in');
-			                  	console.log(d);
 			                  	d3.select(this).attrs({
 				                    'class': 'd_minimap-chart-title',
 				                  	'x': x(new Date(d.start)),
@@ -83,18 +80,18 @@ export default class extends React.Component {
 				                .style("text-anchor", "left")
 				                .style("font-size", Math.min(0.7*((that.props.height - 2)/(that.props.datasets.length + 1)), 14))
 						  });
-			text_selection.append('text')
-			              .each(function (d, i) {
-			                  	console.log('were in');
-			                  	console.log(d);
-			                  	d3.select(this).attrs({
-				                    'class': 'd_minimap-chart-title',
-				                  	'x': x(new Date(d.end)),
-				                  	'y': ((i + 2)*((that.props.height - 2)/(that.props.datasets.length + 1)))
-				                }).text(i + 1)
-				                .style("text-anchor", "middle")
-				                .style("font-size", Math.min(0.7*((that.props.height - 2)/(that.props.datasets.length + 1)), 14))
-						  });
+			// text_selection.append('text')
+			//               .each(function (d, i) {
+			//                   	console.log('were in');
+			//                   	console.log(d);
+			//                   	d3.select(this).attrs({
+			// 	                    'class': 'd_minimap-chart-title',
+			// 	                  	'x': x(new Date(d.end)),
+			// 	                  	'y': ((i + 2)*((that.props.height - 2)/(that.props.datasets.length + 1)))
+			// 	                }).text(i + 1)
+			// 	                .style("text-anchor", "middle")
+			// 	                .style("font-size", Math.min(0.7*((that.props.height - 2)/(that.props.datasets.length + 1)), 14))
+			// 			  });
 		})();
 	}
 }
