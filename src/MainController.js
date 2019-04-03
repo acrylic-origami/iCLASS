@@ -1,7 +1,7 @@
 import React from 'react';
 import D3Controller from './d3Controller';
 import AnnotatePopUp from './AnnotatePopUp';
-import Annotation from './Annotation';
+import AnnotationList from './AnnotationList';
 
 export default class extends React.Component {
 	constructor(props) {
@@ -31,7 +31,7 @@ export default class extends React.Component {
 			marginLeft: "300px"
 		};
 
-		this.brushWrapStyle = {
+		this.sidebarWrapStyle = {
 			position: "absolute",
 			top: "0",
 			left: "0",
@@ -41,7 +41,7 @@ export default class extends React.Component {
 			overflowX: "scroll",
 		};
 
-		this.brushInnerWrapStyle = {
+		this.sidebarInnerWrapStyle = {
 			position: "relative"
 		};
 
@@ -59,10 +59,6 @@ export default class extends React.Component {
 
 		this.mainStyle = {
 			fontFamily: "sans-serif"
-		};
-
-		this.brushListMargin = {
-			paddingBottom: "100px"
 		};
 	}
 	
@@ -103,7 +99,7 @@ export default class extends React.Component {
 	// Saves results from new annotation form
 	// AND updates brushes
 	addAnnotation = d => {
-		const newAnnotations = this.state.annotations;
+		const newAnnotations = [].concat(this.state.annotations);
 		if(d.is_new) {
 			newAnnotations.push({startTime: d.startTime, type: d.type, notes: d.notes});
 		} else {
@@ -113,7 +109,6 @@ export default class extends React.Component {
 		}
 		
 		newAnnotations.sort((a, b) => a.startTime - b.startTime);
-		this.annotationsToBrushes(newAnnotations);
 		this.setState(state_ => ({
 			annotations: newAnnotations,
 			screenPosY: 0,
@@ -127,82 +122,13 @@ export default class extends React.Component {
 
 	// Updates the start times of annotations that were edited via the brushes
 	onUpdateAnnotation = d => {
-		const newAnnotations = this.state.annotations;
+		const newAnnotations = [].concat(this.state.annotations);
 		d.map((data, index) => {
 			newAnnotations[data.id].startTime = data.time;
 		});
+		newAnnotations.sort((a, b) => a.startTime - b.startTime);
 		this.setState(state_ => ({
 			annotations: newAnnotations
-		}));
-	};
-
-	// Converts annotations to brushes, ie checks for onset/offset pairs
-	annotationsToBrushes = annots => {
-		// creates an array of brushes combining onsets and offsets where possible
-		const newBrushes = [];
-		var lastOnsetTime = null;
-		var lastOnsetId = null;
-		annots.map((data, index) => {
-			if(lastOnsetTime != null) { // looking for seizure
-				if(data.type == "offset") {
-					// found seizure
-					newBrushes.push({
-										type: "range",
-										times: [lastOnsetTime, data.startTime], // set brush to have times [last onset, this offset]
-										ids: [lastOnsetId, index], // this one is debatable I guess
-										titles: ["Seizure Onset", "Seizure Offset"]
-									});
-					lastOnsetTime = null;
-				} else if (data.type == "onset") {
-					// found new onset
-					newBrushes.push({
-										type: "point",
-										times: [lastOnsetTime, 
-												new Date(lastOnsetTime).setSeconds(lastOnsetTime.getSeconds() + 2)],
-										ids: [lastOnsetId],
-										titles: ["Seizure Onset", ""]
-									});
-					// update lastOnsetTime
-					lastOnsetTime = data.startTime;
-					lastOnsetId = index;
-				} else {
-					// found patient data
-					newBrushes.push({
-										type: "point",
-										times: [data.startTime, 
-												new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-										ids: [index],
-										titles: ["Patient Event", ""]
-									});
-				}
-			} else if(data.type == "onset") {
-				// set new onset
-				lastOnsetTime = data.startTime;
-				lastOnsetId = index;
-			} else {
-				// add lonely offset or patient data
-				newBrushes.push({
-									type: "point",
-									times: [data.startTime, 
-											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-									ids: [index],
-									titles: [(data.type == "offset") ? "Seizure Offset" : "Patient Event", ""]
-								});
-			}
-			if(index == annots.length - 1 && lastOnsetTime != null) {
-				// add lonely onset
-				newBrushes.push({
-									type: "point",
-									times: [data.startTime, 
-											new Date(data.startTime).setSeconds(data.startTime.getSeconds() + 2)],
-									ids: [index],
-									titles: ["Seizure Onset", ""]
-								});
-			}
-		});
-		// update brushes state, which will affect d3 controller
-		this.setState(state_ => ({
-			brushes: newBrushes
 		}));
 	};
 
@@ -225,33 +151,20 @@ export default class extends React.Component {
 				ref={this.d3child}
 				is_editing={this.state.is_editing}
 				updateAnnotation={this.onUpdateAnnotation}
-				brushes={this.state.brushes}
+				annotations={this.state.annotations}
 				openNewAnnotationPopUp={this.openNewAnnotation}
 				width={960}
 				height={640}
 				/>
 		</div>
-		<div style={this.brushWrapStyle}>
-			<div style={this.brushInnerWrapStyle}>
+		<div style={this.sidebarWrapStyle}>
+			<div style={this.sidebarInnerWrapStyle}>
 				<div style={this.buttonWrapStyle}> 
 					<button style={this.buttonStyle} className="edit-zoom-toggle" id="edit-zoom-toggle" type="button" onClick={this.onEditZoomToggle}>
 						{this.state.is_editing ? 'Zoom/Pan' : 'Annotate'}
 					</button>
 				</div>
-				<div className="brush-list" style={this.brushListMargin} id="brush-list">
-					<div className="annotationList">
-						{this.state.annotations.map((annot, index) =>
-							<Annotation
-								key={"annot-" + index}
-								time={annot.startTime}
-								type={annot.type}
-								notes={annot.notes}
-								annot_id={index}
-								openNewAnnotationPopUp={this.openNewAnnotation}
-							/>
-						)}
-					</div>
-				</div>
+				<AnnotationList annotations={this.state.annotations} />
 			</div>
 		</div>
 	</div>;
