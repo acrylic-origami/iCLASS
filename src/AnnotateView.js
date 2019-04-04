@@ -6,7 +6,9 @@ import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './A
 export default class extends React.Component {
 	constructor(props) {
 		super(props);
-
+		
+		this.form = React.createRef();
+		
 		this.state = {
 			startPlaceholder: "",
 			is_new: false,
@@ -49,28 +51,27 @@ export default class extends React.Component {
 			width: "188px"
 		};
 	}
+	
+	// componentDidMount() {
+	// 	const submit_event = document.createEvent('Event');
+	// 	submit_event.initEvent('submit', true, true)
+	// 	this.form.current.dispatchEvent(submit_event);
+	// }
 
-	onSubmit = d => {
-		// convert string to time
-		const time = d.startTimeString.split(":");
-		const newTime = new Date(this.props.startTime);
-		newTime.setHours(time[0]);
-		newTime.setMinutes(time[1]);
-		newTime.setSeconds(time[2]);
-		newTime.setMilliseconds(time[3]*10);
-		
-		const new_annotation = (() => {
+	onSubmit = (d) => {
+		const AnnotationClass = (() => {
 			switch(d.type) {
-				case 'onset': return new OnsetBrush(newTime, [d.notes]);
-				case 'offset': return new OffsetBrush(newTime, [d.notes]);
-				case 'point': return new PointBrush(newTime, [d.notes]);
+				case 'onset': return OnsetBrush;
+				case 'offset': return OffsetBrush;
+				case 'point': return PointBrush;
 			}
 		})();
 		
-		this.props.onSubmit(new_annotation);
+		this.props.onSubmit(new AnnotationClass(
+			this.props.annotation ? this.props.annotation.get_start() : this.props.startTime,
+			this.props.annotating_at
+		));
 	}
-	
-	mustBeTime = value => (this.isTime(value)  ? "Error: Time must be in the format HH:MM:SS:mSmS (e.g. 23:59:59:99)" : undefined)
 
 	isTime = value => {
 		const time = value.split(":");
@@ -96,10 +97,11 @@ export default class extends React.Component {
 					</div>
 					<Form
 		      			onSubmit={this.onSubmit}
-		      			initialValues={{ startTimeString: (this.props.annotation ? this.props.annotation.get_start() : this.props.startTime).toLocaleTimeString('en-GB'), type: this.props.annotation ? data_name(this.props.annotation) : 'onset', notes: (this.props.annotation != null && this.props.annotation.notes) || '' }}
-		      			render={({ onSubmit, reset, form, submitting, pristine, values }) => (
-		      				<form onSubmit={onSubmit}
-		      						 style={this.formStyle}>
+		      			initialValues={{ /* startTimeString: (this.props.annotation ? this.props.annotation.get_start() : this.props.startTime).toLocaleTimeString('en-GB') */ type: this.props.annotation ? data_name(this.props.annotation) : 'onset', notes: (this.props.annotation != null && this.props.annotation.notes) || '' }}
+		      			render={({ handleSubmit, reset, form, submitting, pristine, values }) => (
+		      				<form onSubmit={e => { e.preventDefault(); e.stopPropagation(); handleSubmit(e); }}
+		      						 style={this.formStyle}
+		      						 ref={this.form}>
 		          				<div style={this.sectionStyle}>
 		            				<div><label>Type</label></div>
 		            				<Field name="type" component="select">
@@ -108,23 +110,12 @@ export default class extends React.Component {
 		              					<option value="point">Patient Event</option>
 		            				</Field>
 		          				</div>
-		          				<Field name="startTimeString" validate={this.mustBeTime}>
-		            				{({ input, meta }) => (
-		            					<div style={this.sectionStyle}>
-		                					<div><label>Time</label></div>
-		               						<input {...input} type="text" placeholder="HH:MM:SS:MM" style={this.inputStyle} />
-		                						{meta.error && meta.touched && <span style={this.errorStyle}>{meta.error}</span>}
-		              					</div>
-		            				)}
-		          				</Field>
 		      					<div style={this.sectionStyle}>
 		            				<div><label>Notes</label></div>
 		            				<Field name="notes" component="textarea" placeholder="Notes" style={this.inputStyle} />
 		          				</div>
 		      					<div className="buttons" style={this.buttonWrapStyle}>
-		            				<button type="submit" disabled={submitting} style={this.buttonStyle}>
-		             					Save
-		            				</button>
+		            				<input type="submit" disabled={submitting} style={this.buttonStyle} value="Save" />
 		           					<button
 		              					type="button"
 		             					onClick={this.props.onCancel}

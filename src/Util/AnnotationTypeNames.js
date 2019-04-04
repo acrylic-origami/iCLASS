@@ -1,3 +1,5 @@
+import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from '../Annotations';
+
 export function view_name(annot) {
 	switch(annot.constructor) {
 		case OnsetBrush: return "Seizure Onset";

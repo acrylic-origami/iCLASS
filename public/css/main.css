@@ -15,6 +15,12 @@ button {}
 	z-index:-999;
 	pointer-events:none;
 }
+.group {
+	content: "";
+	display: table;
+	width:100%;
+	clear: both;
+}
 
 div#main {}
 	div.brushWrap {
@@ -38,31 +44,54 @@ div#main {}
 		}
 	.brush-list {
 		padding-bottom: 100px;
+		list-style-type:none;
+		margin:0;
+		padding:0;
+		font-size:0.55em;
 	}
 	
-	.annotation {
-		position: relative;
-		padding-top: 20px;
-		margin: 5px;
-		font-size: 18px;
-		cursor: pointer;
-	}
-		.annotation > h2 {
-			position: absolute;
-			top: 0px;
-			left: 0px;
-			font-size:1.2em;
+		.annotation {
+			position: relative;
+			border-bottom:#BBB solid 1px;
 		}
-		.annotation > .time {
-			position: absolute,
-			top: 0px,
-			right: 0px,
+		.annotation > a {
+			margin:1em 0.5em;
+			display:block;
 		}
-		.annotation > .note {
-			color: grey,
-			font-Size: 15px,
-			padding: 5px 20px 0 20px,
+		.annotation.grouped {
+			background-color:#99cae5;
+			border-bottom:#55849e solid 1px;
 		}
+		.annotation.grouped.onset::before {
+			content:"Seizure";
+			display:block;
+			margin-bottom:0.4em;
+			background-color:#178ccb;
+			color:#FFF;
+			padding:0.4em;
+			font-size:0.8em;
+			font-weight:bold;
+		}
+		.annotation:last-child {
+			border-bottom:none !important;
+		}
+			.annotation > a {
+				color:inherit;
+				text-decoration:none;
+			}
+				.annotation h2 {
+					/*font-size:1.2em;*/
+					margin:0.1em;
+				}
+				.annotation .time {
+					float:right;
+					font-size:0.7em;
+				}
+				.annotation .note {
+					color: grey,
+					font-size: 0.7em,
+					padding: 5px 20px 0 20px,
+				}
 
 	.d3wrap {
 		margin-left:300px;

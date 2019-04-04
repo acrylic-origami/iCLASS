@@ -10,13 +10,13 @@ import {debounceTime, bufferCount, map} from 'rxjs/operators';
 import DataController from './FlatData';
 import {BASEGRAPH_ZOOM, EPS, FULL_RES_INTERVAL} from './consts';
 import AnnotateView from './AnnotateView';
-
+import {group_point_annotations} from './Util/AnnotationCollectionUtils';
 import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './Annotations';
 
 const channels = [...Array(16).keys()];
 const NUM_CH = channels.length;
 const Y_DOMAIN = [-200, 200]; // TODO make this user-adjustable via props
-const OVERSCALING = 10;
+const OVERSCALING = 2;
 
 export default class extends React.Component {
 	constructor(props) {
@@ -39,14 +39,24 @@ export default class extends React.Component {
 		this.area_canvas = React.createRef();
 		
 		this.state = {
-			is_annotating: false,
+			is_annotating: true,
+			is_brushing: false,
 			annotating_id: null,
+			annotating_at: new Date(2018, 5, 4, 21, 55, 58),
+			annotation_preview_id: null, // used to pan to annotations
 			px_ratio: window.devicePixelRatio
 		};
 		
 		// D3 STATE
 		this.px_x_shift = 0; // should this be done through state?
-		this.domain1 = [new Date(this.props.dataset_meta.tstart), new Date(this.props.dataset_meta.tstart + 30000)];
+		this.domain1 = [new Date(this.props.dataset_meta.tstart), new Date(this.props.dataset_meta.tstart + FULL_RES_INTERVAL * 1000)];
+		this.zoom_subj = new Subject();
+		
+		this.zoomFunc = null;
+		this.x_ax = null;
+		this.h_x_ax = null;
+		this.x0 = null;
+		this.y = null; // grrrr, initial null states, pending render for d3 element references
 		
 		// x may be needed for the props-based update
 	}
@@ -79,16 +89,16 @@ export default class extends React.Component {
 			this.x0 = d3.scaleTime()
 			            .range([0, +this.$svg.attr('width')])
 			            .domain(this.domain1); // TODO: consider replacing with a representation relative to the whole dataset width
-			const x = this.x0.copy();
+			this.x = this.x0.copy();
 			
 			this.y = d3.scaleLinear()
 			            .range([+this.$svg.attr('height'), 0])
 			            .domain(Y_DOMAIN); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
-			const x_ax = d3.axisBottom(x),
-			      y_ax = d3.axisLeft(this.y);
+			this.x_ax = d3.axisBottom(this.x);
+			const y_ax = d3.axisLeft(this.y);
 			               
-			const h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(x_ax);
+			this.h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(this.x_ax);
 			const h_y_ax = this.$area.append('g').attr('class', 'axis axis--y').call(y_ax);
 			
 			// const line = d3.line()
@@ -102,16 +112,18 @@ export default class extends React.Component {
 			//         	.attr('class', 'line line-num-'+ch)
 			//    );
 			
-			const zoom_subj = new Subject();
 			this.zoomFunc = d3.zoom()
 			               .extent([[0, 0], [+this.$svg.attr('width'), +this.$svg.attr('height')]])
 			               .on('zoom', e => {
-			               	const new_domain = d3.event.transform.rescaleX(this.x0).domain();
-			               	zoom_subj.next(new_domain); // this might miiiight be a race condition against the React data plumbing
-			               	
-			               	x.domain(new_domain);
-			               	h_x_ax.call(x_ax);
-			               	this.props.onZoom(d3.event.transform)
+			               	// graphics updates + propagation to parent (which will call us again in `zoom_to``)
+			               	if(d3.event.sourceEvent instanceof MouseEvent) {
+				               	const new_domain = d3.event.transform.rescaleX(this.x0).domain();
+				               	
+				               	// gotta validate within domain bounds here too
+				               	if(new_domain[0] > this.data_controller.domain0[0] && new_domain[1] < this.data_controller.domain0[1]) {
+					               	this.props.onZoom(d3.event.transform);
+					               }
+			               	}
 			               });
 			
 			this.$zoom.call(this.zoomFunc).on('dblclick.zoom', null);
@@ -119,13 +131,13 @@ export default class extends React.Component {
 			this.$svg.on("dblclick", e => {
 				this.setState(state_ => ({
 					is_annotating: true,
-					annotating_at: x.invert(d3.event.layerX),
+					annotating_at: this.x.invert(d3.event.layerX),
 					left_px: d3.event.clientX,
 					annotating_id: null
 				}));
 			});
 			
-			zoom_subj.pipe(
+			this.zoom_subj.pipe(
 				debounceTime(200),
 				map(t => t.map(d => d.getTime())) // when rate falls below 10 events per 200ms
 				// buffer[buffer.length - 1]
@@ -167,39 +179,97 @@ export default class extends React.Component {
 			                  });
 		})();
 	}
-
+	
 	componentDidUpdate(prevProps, prevState) {
-		if(prevProps.annotations !== this.props.annotations) {
-			// clear previous brushes
-			const brushSelection = that.$gBrushes
-			    .selectAll('.brush')
-			    .remove();
-			    
-			for(const annotation in this.props.annotations) {
-				var brush = d3.brushX()
-				    .extent([[0, 0], [that.x((that.x.domain())[1]), +that.$svg.attr('height')]])
-				    .on("end", e => {
-				    	const annotation_ = Object.create(Object.getPrototypeOf(annotation), annotation); // TODO crap. I want to preserve object type but also can't mutate a props object (assuming it's the same memory as the parent's reference)
-				    	annotation_.update_with_selection(e.selection);
-				   	this.props.onAnnotationUpdate(annotation.id, annotation_); // let the logic upstairs also deal with the type of brush this is
-				    });
-				    
-				that.$gBrushes.insert("g", '.brush')
-				              .attr("class", "brush")
-				              .attr('id', `brush-${annotation.id}`)
-				              .call(brush);
-			}
-			// remove all brush overlays
-			d3.selectAll('.brush>.overlay').remove();
+		const that = this;
+		if(this.props.annotations !== prevProps.annotations) {
 			this.updateBrushes();
 		}
 		
-		if(this.props.tf !== prevProps.tf)
-			this.zoom_to(this.props.tf);
+		// actual canvas moving
+		if(this.props.tf !== prevProps.tf) {
+			// if has_zoomed is false, the new domain should be the one passed by props
+			let new_domain = this.props.tf.rescaleX(this.x0).domain(); //this.props.has_zoomed ? t_domain : this.props.zoom_times;
+			// constrain domain
+			if(new_domain[0] < this.data_controller.domain0[0] - EPS) {
+				new_domain = [ this.data_controller.domain0[0], new Date(this.data_controller.domain0[0].getTime() + FULL_RES_INTERVAL * 1000) ];
+			}
+			else if(new_domain[1] > this.data_controller.domain0[1] + EPS) {
+				new_domain = [ new Date(this.data_controller.domain0[1].getTime() - FULL_RES_INTERVAL * 1000), this.data_controller.domain0[1] ];
+			}
+			
+			// this is rather clumsy tbh
+			this.zoomFunc.translateTo(this.$zoom, (this.x0(new_domain[0]) + this.x0(new_domain[1])) / 2, 0);
+			
+			// limit to dataset window
+
+			const enclosing_domain = this.data_controller.expand_domain(new_domain);
+			const did_wrap_right = (this.x0(new_domain[1]) - this.px_x_shift) * this.state.px_ratio > this.area_canvas.current.width,
+			did_wrap_left = (this.x0(new_domain[0]) - this.px_x_shift) < 0;
+			if(did_wrap_left || did_wrap_right) {
+				this.data_controller.clear_visible();
+				this.area_ctx.clearRect(0, 0, this.area_canvas.current.width, this.area_canvas.current.height);
+				if(did_wrap_right) {
+					// wrap around right ; new data will draw off canvas
+					// for now, just assume a single data frame is in view
+					// when using `this.x` to transform the x-shift in time, we assume that `this.x` is a linear scale; if logarithmic or something else funky then we have to convert that time delta to a px delta more carefully
+					this.px_x_shift = this.x0(enclosing_domain[0]) - this.x0(this.domain1[0]);
+				}
+				else if(did_wrap_left) {
+					this.px_x_shift = this.x0(enclosing_domain[1]) - this.area_canvas.current.width / this.state.px_ratio;
+				}
+			}
+
+			this.x.domain(new_domain); // i hate that this is the only reason we need to lift `x` into the global object scope
+			this.h_x_ax.call(this.x_ax); // same with `h_x_ax``
+			
+			const tf_str = `translate(${-this.x0(new_domain[0]) + this.px_x_shift}px, 0) scale(${this.props.tf.k}, 1)`;
+			this.area_canvas.current.style.transform = tf_str;
+			this.$gBrushes.selectAll('.brush')
+			              .each(function() {
+			              	const annotations = this.getAttribute('data-annotation').split('-');
+			              	that.move_brush(annotations.length > 1 ? annotations.map(i => that.props.annotations.get(parseInt(i))) : that.props.annotations.get(parseInt(annotations[0])));
+			              })
+			
+			if(did_wrap_left || did_wrap_right) {
+				return this.resampleData(new_domain);
+			}
+			else {
+				this.zoom_subj.next(new_domain); // this might miiiight be a race condition against the React data plumbing
+				return Q();
+			}
+		}
 		
-		if(this.props.annotating_id != null && this.props.annotating_id !== prevProps.annotating_id) { // second condition might be covered by setState matching
-			console.log(this.props.tf);
+		// evented canvas moving
+		const is_visible = domain => {
+			if(!Array.isArray(domain))
+				domain = [domain, domain];
+			
+			return (this.x0(domain[0]) - this.px_offset) > 0 && (this.x0(domain[0]) - this.px_offset) < this.props.width ||
+				(this.x0(domain[1]) - this.px_offset) > 0 && (this.x0(domain[1]) - this.px_offset) < this.props.width;
+		};
+		const dry_zoom_to_annotation = id => {
+			const annotation_time = this.props.annotations.get(id).get_start();
+			const zoom = d3.zoomTransform(this.$zoom.node());
+			if(!is_visible(annotation_time)) {
+				const annotation_px = [
+					this.x(new Date(annotation_time.getTime() - FULL_RES_INTERVAL / 2 * 1000)),
+					this.x(new Date(annotation_time.getTime() + FULL_RES_INTERVAL / 2 * 1000))
+				];
+				return zoom.translate(-Math.round(annotation_px[0]), 0);
+			}
+			else {
+				return zoom;
+			}
+		}
+		
+		if(this.props.annotation_preview_id != null && this.props.annotation_preview_nonce !== prevProps.annotation_preview_nonce) {
+			this.props.onZoom(dry_zoom_to_annotation(this.props.annotation_preview_id));
+		}
+		
+		if(this.props.annotating_id != null && this.props.annotating_nonce !== prevProps.annotating_nonce) {
 			// this.zoom_to(d3.transform.)
+			this.props.onZoom(dry_zoom_to_annotation(this.props.annotating_id));
 			this.setState({
 				is_annotating: true,
 				annotating_id: this.props.annotating_id
@@ -208,34 +278,80 @@ export default class extends React.Component {
 	}
 	
 	/* protected */
+	move_brush(annotation) {
+		const brush = d3.brushX()
+		    .extent([[0, 0], [0, +this.$svg.attr('height')]])
+		    .on("start", _ => this.setState({ is_brushing: true }))
+		    // .on("brush", function() { console.log(arguments, this); })
+		    .on("end", () => {
+		    	if(Array.isArray(annotation)) {
+		    		switch(annotation.length) {
+						case 2:
+							for(let j = 0; j < annotation.length; j++) {
+							 	const annotation_ = Object.assign(Object.create(Object.getPrototypeOf(annotation[j])), annotation[j]);
+							 	annotation_.update_with_selection(d3.event.selection.slice(j, j+1));
+							 	annotation[j] = annotation_; // meh mutation hack
+							}
+							break;
+					}
+		    	}
+		    	else {
+			    	const annotation_ = Object.assign(Object.create(Object.getPrototypeOf(annotation)), annotation);
+			    	annotation_.update_with_selection(d3.event.selection);
+			    	annotation = annotation_;
+		    	}
+		    	
+	    	 	if(this.state.is_brushing && d3.event.sourceEvent instanceof MouseEvent)
+	    			this.props.onAnnotate(annotation); // let the logic upstairs also deal with the type of brush this is
+	    		
+		    	this.setState({ is_brushing: false }); // needed to prevent recursive updates from onAnnotate -> updateBrushes -> on('end')
+		    });
+		    
+		if(Array.isArray(annotation)) {
+			const $gBrush = d3.select(`g#brush-${annotation.map(a => a.id).join('-')}`);
+			
+			switch(annotation.length) {
+				case 2:
+					
+					$gBrush.attr("class", "brush range");
+
+					// Move the brush to the startTime and endTime
+					if($gBrush.select('rect').size() === 0)
+						$gBrush.call(brush)
+						
+					$gBrush.call(brush.move, [ annotation[0].get_start(), annotation[1].get_start() ].map(this.x));
+					break;
+				default:
+					// let your imagination run wild here
+					break;
+			}
+		}
+		else { 
+			// switch(annotation.constructor) {
+			// 	case PointBrush:
+			const $gBrush = d3.select(`g#brush-${annotation.id}`);
+
+			// Move the brush to the startTime + a fixed width
+			// console.log(this.domain1, annotation.get_start(), this.x0(annotation.get_start()), this.x0(annotation.get_start()) + 2, brush_(annotation).extent);
+			if($gBrush.select('rect').size() === 0)
+				$gBrush.call(brush)
+				
+			$gBrush.call(brush.move, [this.x(annotation.get_start()), this.x(annotation.get_start()) + 2]);
+			
+			$gBrush.selectAll('.brush>.handle').remove();
+			$gBrush.attr("class", "brush point");
+					// Remove the handles so can't be resized
+					// break;
+			// }
+		}
+	}
+	
+	/* protected */
 	updateBrushes() {
 		// If point, add brush, delete handles, add title (after)
 		// If range, add brush, add custom handles with titles
-		
-		for(const annotation in this.props.annotations) {
-			const gBrush = d3.select(`brush-${annotation.id}`);
-			switch(annotation.constructor) {
-				case OnsetBrush:
-					gBrush.selectAll('.brush>.handle').remove();
-					
-					gBrush.attr("class", "brush point");
-
-					// Move the brush to the startTime + a fixed width
-					gBrush.call(brush.move, [that.x(annotation.get_start()), that.x(annotation.get_start()) + 2]);
-
-					// Remove the handles so can't be resized
-					break;
-				case RangeBrush:
-					gBrush.attr("class", "brush range");
-
-					// Move the brush to the startTime and endTime
-					gBrush.call(brush.move, [ annotation.get_start(), annotation.get_end() ].map(x));
-					
-					// add titles as custom handles
-					break;
-					
-			}
-		}
+		group_point_annotations(this.props.annotations.toList()).forEach(this.move_brush.bind(this));
+		// debugger;
 	}
 
 	render = () => <div>
@@ -273,7 +389,17 @@ export default class extends React.Component {
 		</div>
 		<svg className="plot" ref={this.svg} width={this.props.width} height={this.props.height}>
 			<g ref={this.area}></g>
-			<g ref={this.gBrushes} className="brushes"></g>
+			<g className="brushes" ref={this.gBrushes}>
+				{group_point_annotations(this.props.annotations.toList()).map((a, i) => {
+					const bulk_id = Array.isArray(a) ? a.map(a_ => a_.id).join('-') : a.id;
+					return <g
+						id={`brush-${bulk_id}`}
+						key={i}
+						className='brush'
+						data-annotation={bulk_id}
+					/>
+				})}
+			</g>
 			<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} width={this.props.width} height={this.props.height} ref={this.zoom} />
 		</svg>
 		<canvas ref={this.minimap_canvas} style={{ width: `${this.props.width}px`, height: `${this.props.height}px` }} width={this.props.width * this.state.px_ratio} height={100 * this.state.px_ratio}></canvas>
@@ -315,41 +441,5 @@ export default class extends React.Component {
 					}
 				}
 			}).catch(console.log)
-	}
-	
-	zoom_to = tf => {
-		// if has_zoomed is false, the new domain should be the one passed by props
-		const new_domain = tf.rescaleX(this.x0).domain();//this.props.has_zoomed ? t_domain : this.props.zoom_times;
-		if(new_domain[0] > this.data_controller.domain0[0] && new_domain[1] < this.data_controller.domain0[1]) {
-			// limit to dataset window
-
-			const enclosing_domain = this.data_controller.expand_domain(new_domain);
-			const did_wrap_right = (this.x0(new_domain[1]) - this.px_x_shift) * this.state.px_ratio > this.area_canvas.current.width,
-			did_wrap_left = (this.x0(new_domain[0]) - this.px_x_shift) < 0;
-			if(did_wrap_left || did_wrap_right) {
-				this.data_controller.clear_visible();
-				this.area_ctx.clearRect(0, 0, this.area_canvas.current.width, this.area_canvas.current.height);
-				if(did_wrap_right) {
-					// wrap around right ; new data will draw off canvas
-					// for now, just assume a single data frame is in view
-					// when using `this.x` to transform the x-shift in time, we assume that `this.x` is a linear scale; if logarithmic or something else funky then we have to convert that time delta to a px delta more carefully
-					this.px_x_shift = this.x0(enclosing_domain[0]) - this.x0(this.domain1[0]);
-				}
-				else if(did_wrap_left) {
-					this.px_x_shift = this.x0(enclosing_domain[1]) - this.area_canvas.current.width / this.state.px_ratio;
-				}
-			}
-
-			const tf_str = `translate(${tf.x + this.px_x_shift}px, 0) scale(${tf.k}, 1)`;
-			this.area_canvas.current.style.transform = tf_str;
-			
-			// update brushes through x()
-			this.updateBrushes();
-			
-			if(did_wrap_left || did_wrap_right)
-				return this.resampleData(new_domain);
-			else
-				return Q();
-		}
 	}
 }

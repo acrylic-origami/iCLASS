@@ -2,7 +2,9 @@ import React from 'react';
 import {Map} from 'immutable';
 import { Link } from "react-router-dom";
 import D3Controller from './d3Controller';
-import {view_name} from './Util/AnnotationTypeNames';
+import {view_name, data_name} from './Util/AnnotationTypeNames';
+
+import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './Annotations';
 
 export default class extends React.Component {
 	constructor(props) {
@@ -10,9 +12,15 @@ export default class extends React.Component {
 		this.state = {
 			is_editing: false,
 			d3_tf: null,
+			
 			annotation_idx: 0,
 			annotations: new Map(),
-			annotating_id: null
+			
+			annotating_id: null,
+			annotating_nonce: 0,
+			
+			annotation_preview_id: null,
+			annotation_preview_nonce: 0
 		};
 	}
 	
@@ -51,60 +59,44 @@ export default class extends React.Component {
 			// new annotation
 			this.setState(state_ => {
 				const next_annotations = (() => {
-					// merge annotations where necessary
-					if(annotation instanceof OnsetBrush || annotation instanceof OffsetBrush) {
-						const targets = state_.annotations.sort((a, b) => a.get_start() - b.get_start()).toList();
-						if(annotation instanceof OnsetBrush) {
-							// looking for the offset
-							for(const target of targets) {
-								if(targets.get_start() > annotation.get_start() && targets instanceof OffsetBrush) {
-									const seizure_annotation = new SeizureBrush(
-										[annotation.get_start(), target.get_start()],
-										target.notes.concat(annotation.notes),
-										state_.annotation_idx + 1
-									);
-									return next_annotations.delete(target.id)
-									                       .set(state_.annotation_idx, seizure_annotation);
-								}
-							}
-						}
-						else {
-							// looking for the onset
-							for(const target of targets.reverse()) {
-								if(target.get_start() < annotation.get_start() && target instanceof OnsetBrush) {
-									const seizure_annotation = new SeizureBrush(
-										[targets.get_start(), annotation.get_start()],
-										target.notes.concat(annotation.notes),
-										state_.annotation_idx + 1
-									);
-									return next_annotations.delete(target.id)
-									                       .set(state_.annotation_idx, seizure_annotation);
-								}
-							}
-						}
-					}
-					
 					// fallthrough: tack the annotation onto the end
 					annotation.set_id(state_.annotation_idx);
+					// debugger;
 					return state_.annotations.set(state_.annotation_idx, annotation);
 				})();
-				
 				return {
-					annotation_idx: annotation_idx + 1,
+					annotation_idx: state_.annotation_idx + 1,
 					annotations: next_annotations
 				};
 			});
 		}
 		else {
-			this.setState(state_ => ({
+			this.setState(state_ => console.log(annotation, state_.annotations.get(annotation.id)) || ({
 				annotations: state_.annotations.has(annotation.id) ? state_.annotations.set(annotation.id, annotation) : state_.annotations
 			}));
 		}
 	};
 	
-	onAnnotationUpdate = annotation => this.setState(state_ => ({
-		annotations: state_.has(state_.annotations.set()) // TODO
-	}));
+	onAnnotationZoomTo = e => {
+		// TODO check if this is handleable by React Router
+		const annotation_id = parseInt(document.location.hash.slice(1));
+		this.setState(state_ => ({
+			annotation_preview_id: annotation_id,
+			annotation_preview_nonce: state_.annotation_preview_nonce + 1
+		}))
+		
+	}
+	
+	onAnnotationSelect = e => {
+		this.setState(state_ => ({
+			annotating_id: parseInt((new URL(e.target.href)).hash.slice[1]),
+			annotating_nonce: state_.annotating_nonce + 1
+		}));
+	}
+	
+	// onAnnotationUpdate = annotation => this.setState(state_ => ({
+	// 	annotations: state_.has(state_.annotations.set()) // TODO
+	// }));
 	
 	onZoom = tf => this.setState({ d3_tf: tf });
 	
@@ -114,9 +106,14 @@ export default class extends React.Component {
 				dataset_meta={this.props.dataset_meta}
 				is_editing={this.state.is_editing}
 				annotations={this.state.annotations}
+				
 				annotating_id={this.state.annotating_id}
+				annotating_nonce={this.state.annotating_id}
+				
+				annotation_preview_id={this.state.annotation_preview_id}
+				annotation_preview_nonce={this.state.annotation_preview_nonce}
+				
 				onAnnotate={this.onAnnotate}
-				onNewAnnotation={this.onNewAnnotation}
 				tf={this.state.d3_tf}
 				onZoom={this.onZoom}
 				width={960}
@@ -132,16 +129,26 @@ export default class extends React.Component {
 					</button>
 				</div>
 				<ul className="brush-list" id="brush-list">
-					{this.state.annotations.toList().map((annot) =>
-						<li
-							className="annotation"
-							key={"annot-" + index}
-							onDoubleClick={() => this.setState({ annotating_id: annot.id })}>
-							<h2>{view_name(annot)}</h2>
-							<div className="time">{annot.get_start().toLocaleString()}</div>
-							<div className="note">{annot.notes}</div>
-						</li>
-					)}
+					{(() => {
+						const sorted_annotations = this.state.annotations.sort((a, b) => a.get_start() - b.get_start()).toList();
+						return sorted_annotations.map((annot, i) =>
+							<li
+								className={`annotation group ${data_name(annot)} ${
+									(
+										i > 0 && annot instanceof OffsetBrush && sorted_annotations.get(i - 1) instanceof OnsetBrush || 
+										i < sorted_annotations.size && annot instanceof OnsetBrush && sorted_annotations.get(i + 1) instanceof OffsetBrush
+									) ? 'grouped' : ''
+								}`}
+								key={"annot-" + i}
+								onDoubleClick={() => this.setState({ annotating_id: annot.id })}>
+								<a href={`#${annot.id}`} onClick={this.onAnnotationZoomTo} onDoubleClick={this.onAnnotationSelect}>
+									<div className="time">{annot.get_start().toLocaleString()}</div>
+									<h2>{view_name(annot)}</h2>
+									<div className="note">{annot.notes}</div>
+								</a>
+							</li>
+						);
+					})()}
 				</ul>
 			</div>
 		</div>

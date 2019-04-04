@@ -15,18 +15,22 @@ interface SeizureBrush extends RangeBrush {}
 class Annotation {
 	set_id(id) { this.id = id; }
 	get_start() { /* abstract */ }
+	update_with_selection(selection) { /* abstract */ console.log(arguments); }
 }
-export class PointBrush {
+class PointBrush extends Annotation {
 	constructor(start, notes, id = null) {
+		super();
+		
 		this.start = start;
 		this.notes = notes;
 		this.id = id;
 	}
 	get_start() { return this.start; }
+	update_with_selection(selection) { this.start = selection[0]; }
 }
-export class OnsetBrush extends PointBrush {}
-export class OffsetBrush extends PointBrush {}
-export class RangeBrush extends Annotation {
+class OnsetBrush extends PointBrush {}
+class OffsetBrush extends PointBrush {}
+class RangeBrush extends Annotation {
 	constructor(range, notes, id = null) {
 		this.range = range;
 		this.notes = notes;
@@ -34,5 +38,10 @@ export class RangeBrush extends Annotation {
 	}
 	get_start() { return this.range[0]; }
 	get_end() { return this.range[1]; }
+	update_with_selection(selection) { this.range = selection; }
 }
-export class SeizureBrush extends RangeBrush {}
+class SeizureBrush extends RangeBrush {}
+
+export {
+	PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush
+};

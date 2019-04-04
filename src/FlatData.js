@@ -12,7 +12,7 @@ export default class {
 		this.visible_chunks = new Set();
 		this.domain0 = [new Date(dataset_meta.tstart), new Date(dataset_meta.tstart + dataset_meta.point_count / dataset_meta.Fs * 1000)];
 		this.zoom = Math.ceil(Math.log2((this.domain0[1] - this.domain0[0]) / (30 * 1000))); // FULL_RES_INTERVAL
-		console.log(this.domain0, this.zoom);
+		// console.log(this.domain0, this.zoom);
 		// this.requestor = requestor; // (zoom: int, start: Frac, end: Frac) => Promise<Array<StampedData>>
 	}
 	
@@ -52,7 +52,7 @@ export default class {
 		return this.fetch_new_data(domain).then(_ => {
 			const nums = this.domain_to_loose_numerators(domain);
 			const new_idxs = nums.filter(chunk_idx => !this.visible_chunks.has(chunk_idx));
-			console.log(domain, nums, this.visible_chunks);
+			// console.log(domain, nums, this.visible_chunks);
 			const ret = new_idxs.map(chunk_idx =>
 				this.chunks.get(chunk_idx)
 					.reduce((acc, a) => { // flatten server chunks
