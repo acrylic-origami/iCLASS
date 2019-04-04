@@ -55,7 +55,7 @@ div#main {}
 			border-bottom:#BBB solid 1px;
 		}
 		.annotation > a {
-			margin:1em 0.5em;
+			margin:0.6em 0.5em;
 			display:block;
 		}
 		.annotation.grouped {

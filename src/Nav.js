@@ -1,6 +1,6 @@
 import React from 'react';
 import { Route,
-	     NavLink,
+	     Link,
 	     BrowserRouter,
 	     Switch
 } from "react-router-dom";
@@ -21,6 +21,15 @@ export default class extends React.Component {
 
 		this.browserWrap = {
 			zIndex: 10000
+		}
+
+		this.userNameStyle = {
+			position: 'absolute',
+			top: '0',
+			right: '0',
+			padding: '5px',
+			backgroundColor: 'white',
+			zIndex: 1000
 		}
 	}
 
@@ -55,6 +64,9 @@ export default class extends React.Component {
 			{(this.state.loaded) ? 
 				<BrowserRouter>
 					<div>
+						<div style={this.userNameStyle}>
+							Gerard O'Leary <Link to={"/"}> log out </Link>
+						</div>
 						<Switch>
 							<Route exact path={"/"} render={props => <PatientNav {...props} patientNotFound={false} patientAccounts={this.state.patientAccounts} />} />
 							{this.state.patientAccounts.map((id) => 
