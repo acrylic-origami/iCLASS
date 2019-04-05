@@ -163,8 +163,7 @@ export default class extends React.Component {
 				// debugger;
 				this.setState(state_ => ({
 					is_annotating: true,
-					annotating_at: [[d3.event.layerX, d3.event.layerY], [d3.event.clientX, d3.event.clientY]],
-					left_px: d3.event.clientX,
+					annotating_at: [d3.event.layerX, d3.event.layerY],
 					annotating_id: null
 				}));
 			});
@@ -338,16 +337,17 @@ export default class extends React.Component {
 	/* protected */
 	move_brush(annotation) {
 		const brush = d3.brushX()
-		    .extent([[0, 0], [0, this.area_canvas.current.height / this.state.px_ratio]])
+		    .extent([[0, 0], [this.x0(this.data_controller.domain0[1]), this.area_canvas.current.height / this.state.px_ratio]])
 		    .on("start", _ => this.setState({ is_brushing: true }))
 		    // .on("brush", function() { console.log(arguments, this); })
 		    .on("end", () => {
+    	 		console.log('A', annotation, Array.isArray(annotation));
 		    	if(Array.isArray(annotation)) {
 		    		switch(annotation.length) {
 						case 2:
 							for(let j = 0; j < annotation.length; j++) {
 							 	const annotation_ = Object.assign(Object.create(Object.getPrototypeOf(annotation[j])), annotation[j]);
-							 	annotation_.update_with_selection(d3.event.selection.slice(j, j+1));
+							 	annotation_.update_with_selection(d3.event.selection.slice(j, j+1).map(s => this.x.invert(s)));
 							 	annotation[j] = annotation_; // meh mutation hack
 							}
 							break;
@@ -355,16 +355,24 @@ export default class extends React.Component {
 		    	}
 		    	else {
 			    	const annotation_ = Object.assign(Object.create(Object.getPrototypeOf(annotation)), annotation);
-			    	annotation_.update_with_selection(d3.event.selection);
+			    	annotation_.update_with_selection(d3.event.selection.map(s => this.x.invert(s)));
 			    	annotation = annotation_;
 		    	}
 		    	
-	    	 	if(this.state.is_brushing && d3.event.sourceEvent instanceof MouseEvent)
-	    			this.props.onAnnotate(annotation); // let the logic upstairs also deal with the type of brush this is
+ 	 			console.log(this.state.is_brushing, d3.event.sourceEvent instanceof MouseEvent);
+	    	 	if(this.state.is_brushing && d3.event.sourceEvent instanceof MouseEvent) {
+	    	 		console.log('B', annotation, Array.isArray(annotation));
+	    	 		if(Array.isArray(annotation)) {
+	    	 			for(const a of annotation)
+			    			this.props.onAnnotate(a); // let the logic upstairs also deal with the type of brush this is
+	    	 		}
+		    		else
+		    			this.props.onAnnotate(annotation);
+	    	 	}
 	    		
 		    	this.setState({ is_brushing: false }); // needed to prevent recursive updates from onAnnotate -> updateBrushes -> on('end')
 		    });
-		    
+		   
 		if(Array.isArray(annotation)) {
 			const $gBrush = d3.select(`g#brush-${annotation.map(a => a.id).join('-')}`);
 			
@@ -404,6 +412,7 @@ export default class extends React.Component {
 					// break;
 			// }
 		}
+		d3.selectAll('.brush > .overlay').remove();
 	}
 	
 	/* protected */
@@ -446,7 +455,7 @@ export default class extends React.Component {
 					const bulk_id = Array.isArray(a) ? a.map(a_ => a_.id).join('-') : a.id;
 					return <g
 						id={`brush-${bulk_id}`}
-						key={i}
+						key={bulk_id}
 						className='brush'
 						data-annotation={bulk_id}
 					/>
