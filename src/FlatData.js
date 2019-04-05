@@ -1,15 +1,15 @@
 import Frac from 'fraction.js';
 import Q from 'q';
-import * as d3 from 'd3'
-import { Map, Set } from 'es6-shim';
+import * as d3 from './d3'
+import { Map, Set } from 'immutable';
 import { FULL_RES_INTERVAL } from './consts';
 
 export default class {
 	constructor(dataset_meta) {
 		// StampedData := Array<float, Array<float>>
 		this.dataset_meta = dataset_meta;
-		this.chunks = new Map(); // Map<idx: int, StampedData>
-		this.visible_chunks = new Set();
+		this.chunks = (new Map()).asMutable(); // Map<idx: int, StampedData>
+		this.visible_chunks = (new Set()).asMutable();
 		this.domain0 = [new Date(dataset_meta.tstart), new Date(dataset_meta.tstart + dataset_meta.point_count / dataset_meta.Fs * 1000)];
 		this.zoom = Math.ceil(Math.log2((this.domain0[1] - this.domain0[0]) / (30 * 1000))); // FULL_RES_INTERVAL
 		// console.log(this.domain0, this.zoom);
@@ -38,7 +38,6 @@ export default class {
 		.then(dataset => {
 			for(const [chunk_idx, data] of dataset)
 				this.chunks.set(chunk_idx, data);
-			
 			
 			return dataset.length > 0;
 		});

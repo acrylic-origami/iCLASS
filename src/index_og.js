@@ -1,7 +1,7 @@
 import ReactDOM from 'react-dom';
 import React from 'react';
 import MainController from './MainController';
-import * as d3 from 'd3';
+import * as d3 from './d3';
 import {EPS} from './consts';
 
 const params = new URLSearchParams(document.location.search.substring(1));

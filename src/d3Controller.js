@@ -1,10 +1,10 @@
 import React from 'react';
-import * as d3 from 'd3';
+import * as d3 from './d3';
 import * as d3_multi from 'd3-selection-multi';
 import Q from 'q';
 import Frac from 'fraction.js';
-import {fromEvent, Subject} from 'rxjs';
-import {debounceTime, bufferCount, map} from 'rxjs/operators';
+// import {fromEvent, Subject} from 'rxjs';
+// import {debounceTime, bufferCount, map} from 'rxjs/operators';
 
 // import DataController from './DataController';
 import DataController from './FlatData';
@@ -50,7 +50,7 @@ export default class extends React.Component {
 		// D3 STATE
 		this.px_x_shift = 0; // should this be done through state?
 		this.domain1 = [new Date(this.props.dataset_meta.tstart), new Date(this.props.dataset_meta.tstart + FULL_RES_INTERVAL * 1000)];
-		this.zoom_subj = new Subject();
+		// this.zoom_subj = new Subject();
 		
 		this.zoomFunc = null;
 		this.x_ax = null;
@@ -137,12 +137,12 @@ export default class extends React.Component {
 				}));
 			});
 			
-			this.zoom_subj.pipe(
-				debounceTime(200),
-				map(t => t.map(d => d.getTime())) // when rate falls below 10 events per 200ms
-				// buffer[buffer.length - 1]
-			)
-				.subscribe(this.resampleData);
+			// this.zoom_subj.pipe(
+			// 	debounceTime(200),
+			// 	map(t => t.map(d => d.getTime())) // when rate falls below 10 events per 200ms
+			// 	// buffer[buffer.length - 1]
+			// )
+			// 	.subscribe(this.resampleData);
 
 			this.resampleData(this.domain1);
 		})();
@@ -230,14 +230,14 @@ export default class extends React.Component {
 			              	const annotations = this.getAttribute('data-annotation').split('-');
 			              	that.move_brush(annotations.length > 1 ? annotations.map(i => that.props.annotations.get(parseInt(i))) : that.props.annotations.get(parseInt(annotations[0])));
 			              })
-			
-			if(did_wrap_left || did_wrap_right) {
-				return this.resampleData(new_domain);
-			}
-			else {
-				this.zoom_subj.next(new_domain); // this might miiiight be a race condition against the React data plumbing
-				return Q();
-			}
+		
+			return this.resampleData(new_domain);
+			// if(did_wrap_left || did_wrap_right) {
+			// }
+			// else {
+			// 	this.resampleData(new_domain); // this might miiiight be a race condition against the React data plumbing
+			// 	return Q();
+			// }
 		}
 		
 		// evented canvas moving

@@ -1,6 +1,8 @@
 const path = require('path');
 const webpack = require('webpack');
 const rxPaths = require('rxjs/_esm5/path-mapping');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
+const UglifyJsPlugin = require('uglifyjs-webpack-plugin');
 
 module.exports = [
   {
@@ -19,6 +21,14 @@ module.exports = [
           use: 'babel-loader'
         }
       ]
+    },
+    plugins: [
+      new BundleAnalyzerPlugin()
+    ],
+    optimization: {
+      minimizer: [new UglifyJsPlugin({
+        exclude: /src/
+      })],
     },
     node: {
       fs: 'empty'

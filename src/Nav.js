@@ -4,7 +4,7 @@ import { Route,
 	     BrowserRouter,
 	     Switch
 } from "react-router-dom";
-import * as d3 from 'd3';
+import * as d3 from './d3';
 import * as d3_multi from 'd3-selection-multi';
 import Q from 'q';
 import PatientNav from './PatientNav';
