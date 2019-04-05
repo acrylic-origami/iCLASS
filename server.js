@@ -8,6 +8,7 @@ const csv = require('csv-parser');
 const app = express();
 const Frac = require('fraction.js');
 const { FULL_RES_INTERVAL } = require('./src/consts.js');
+const Q = require('q');
 var bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -64,7 +65,7 @@ function add_dataset(patient, dataset) {
 			createReadStream(annotation_path)
 			  .pipe(csv())
 			  .on('data', ({id, ...rest}) => {
-			    results.set(id, Object.assign({}, rest, { id }));
+			    results.set(parseInt(id), Object.assign({}, rest, { id }));
 			  })
 			  .on('end', () => {
 			    resolve(results);
@@ -210,6 +211,7 @@ app.get('/dataset_meta', (req, res) => {
 		const meta = data.get(id);
 		const dims = meta[4].getDatasetDimensions('data/subsamples');
 		const flat_subsamples_buf = h5lt.readDatasetAsBuffer(meta[5].id, 'subsamples');
+		console.log(meta);
 		res.send({
 			point_count: meta[0].getDatasetDimensions('/data/signal')[0],
 			Fs: meta[2],
@@ -228,33 +230,34 @@ app.get('/get_patients', (req, res) => {
 app.get('/get_datasets', (req, res) => {
   	const datasets = getMatFiles(path.join(`${process.argv[2]}/${req.query.patientId}`));
 	var previous_time = 0;
-	var time_covered = 0;
-	datasets.map((dataset, index) => {
+	let time_covered = 0;
+	Q.all(datasets.map(dataset => {
 		const id = data_id(req.query.patientId, dataset);
-		(!data.has(id) ? add_dataset(req.query.patientId, dataset) : Promise.resolve()).then(() => {
+		return (!data.has(id) ? add_dataset(req.query.patientId, dataset) : Promise.resolve()).then(() => {
 			const meta = data.get(id);
-			datasets[index] = {
-				title: datasets[index],
-				start:  previous_time + meta[3], // tstart
+			const ds = {
+				title: dataset,
+				start: previous_time + meta[3], // tstart
 				end: previous_time + meta[3] + (meta[0].getDatasetDimensions('/data/signal')[0])*(1000/meta[2]) // point_count * (1000/Fs)
 			};
-
-			previous_time += ((index == 1) ? 2 : 1) * (datasets[index].end - datasets[index].start);
-			time_covered += (datasets[index].end - datasets[index].start);
-
-			if(index == datasets.length - 1) {
-				datasets.sort((a, b) => {
-				  return a.start - b.start;
-				});
-				res.send({
-					datasets: datasets,
-					min_start: datasets[0].start,
-					max_end: Math.max.apply(Math, datasets.map(o => o.end)),
-					cover: time_covered/(Math.max.apply(Math, datasets.map(o => o.end)) - datasets[0].start)
-				});
-			}
+			previous_time += 7.8E6;
+			time_covered += ds.end - ds.start;
+			return ds;
 		});
-	});
+	}), console.log).then(ds => {
+		ds.sort((a, b) => {
+		  return a.start - b.start;
+		});
+		// previous_time += ((index == 1) ? 2 : 1) * (datasets[index].end - datasets[index].start);
+		// time_covered += (datasets[index].end - datasets[index].start);
+		
+		res.send({
+			datasets: ds,
+			min_start: ds[0].start,
+			max_end: ds[ds.length - 1].end,
+			cover: time_covered/(ds[ds.length - 1].end - ds[0].start)
+		});
+	}, console.log).catch(console.log);
 })
 
 app.use(express.static('public'));

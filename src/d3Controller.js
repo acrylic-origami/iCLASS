@@ -16,7 +16,7 @@ import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './A
 const channels = [...Array(16).keys()];
 const NUM_CH = channels.length;
 const Y_DOMAIN = [-200, 200]; // TODO make this user-adjustable via props
-const OVERSCALING = 2;
+const OVERSCALING = 10;
 const MINIMAP_HEIGHT = 100;
 
 export default class extends React.Component {
