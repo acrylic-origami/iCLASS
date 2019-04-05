@@ -192,18 +192,24 @@ export default class extends React.Component {
 		// MINIMAP SETUP
 		(() => {
 			const domain0 = [new Date(this.props.dataset_meta.tstart), this.props.dataset_meta.tstart + this.props.dataset_meta.point_count / this.props.dataset_meta.Fs * 1000];
-			const x = d3.scaleTime()
+			this.minimap_x = d3.scaleTime()
 			            .range([0, wrap_rect.width])
 			            .domain([domain0]);
 			const y = d3.scaleLog()
 			            .range([0, MINIMAP_HEIGHT])
 			            .domain([1E-3, 100]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
-			const x_ax = d3.axisBottom(x),
+			const x_ax = d3.axisBottom(this.minimap_x),
 			      y_ax = d3.axisLeft(y);
 			      
 			const h_x_ax = this.$minimap_area.append('g').attr('class', 'axis axis--x').call(x_ax);
 			const h_y_ax = this.$minimap_area.append('g').attr('class', 'axis axis--y').call(y_ax);
+			
+			this.minimap_brusher = d3.brushX()
+		    .extent([[0, 0], [this.minimap_svg.current.getBoundingClientRect().width, this.minimap_svg.current.getBoundingClientRect().height]]);
+		   this.minimap_brush = this.$minimap_area.insert("g", '.brush')
+				.attr('id', 'minimap_brush')
+				.call(this.minimap_brusher);
 			
 			const that = this;
 			
@@ -306,7 +312,9 @@ export default class extends React.Component {
 			              .each(function() {
 			              	const annotations = this.getAttribute('data-annotation').split('-');
 			              	that.move_brush(annotations.length > 1 ? annotations.map(i => that.props.annotations.get(parseInt(i))) : that.props.annotations.get(parseInt(annotations[0])));
-			              })
+			              });
+			              
+			this.minimap_brush.call(this.minimap_brusher.move, [this.minimap_x(new_domain[0]), this.minimap_x(new Date(new_domain[0].getTime() + FULL_RES_INTERVAL * 1000))])
 		
 			return this.resampleData(new_domain);
 			// if(did_wrap_left || did_wrap_right) {
