@@ -5,6 +5,8 @@ import { Link } from "react-router-dom";
 import D3Controller from './d3Controller';
 import * as d3 from './d3';
 import {view_name, data_name, data_name_to_class} from './Util/AnnotationTypeNames';
+import {group_point_annotations} from './Util/AnnotationCollectionUtils';
+import AnnotationLi from './AnnotationLi';
 
 import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './Annotations';
 
@@ -78,15 +80,15 @@ export default class extends React.Component {
 			annotation_preview_id: annotation_id,
 			annotation_preview_nonce: state_.annotation_preview_nonce + 1
 		}))
-		
-	}
+	};
 	
 	onAnnotationSelect = e => {
+		const annotating_id = parseInt((new URL(e.currentTarget.href)).hash.slice[1]);
 		this.setState(state_ => ({
-			annotating_id: parseInt((new URL(e.currentTarget.href)).hash.slice[1]),
+			annotating_id,
 			annotating_nonce: state_.annotating_nonce + 1
 		}));
-	}
+	};
 	
 	// onAnnotationUpdate = annotation => this.setState(state_ => ({
 	// 	annotations: state_.has(state_.annotations.set()) // TODO
@@ -105,24 +107,22 @@ export default class extends React.Component {
 				</div>
 				<ul className="brush-list" id="brush-list">
 					{(() => {
-						const sorted_annotations = this.state.annotations.sort((a, b) => a.get_start() - b.get_start()).toList();
-						return sorted_annotations.map((annot, i) =>
-							<li
-								className={`annotation group ${data_name(annot)} ${
-									(
-										i > 0 && annot instanceof OffsetBrush && sorted_annotations.get(i - 1) instanceof OnsetBrush || 
-										i < sorted_annotations.size && annot instanceof OnsetBrush && sorted_annotations.get(i + 1) instanceof OffsetBrush
-									) ? 'grouped' : ''
-								}`}
-								key={"annot-" + i}
-								onDoubleClick={() => this.setState({ annotating_id: annot.id })}>
-								<a href={`#${annot.id}`} onClick={this.onAnnotationZoomTo} onDoubleClick={this.onAnnotationSelect}>
-									<div className="time">{annot.get_start().toLocaleString()}</div>
-									<h2>{view_name(annot)}</h2>
-									<div className="note">{annot.notes}</div>
-								</a>
-							</li>
-						);
+						const sorted_annotations = group_point_annotations(this.state.annotations.toList());
+						return sorted_annotations.map((annot, i) => {
+							if(Array.isArray(annot)) {
+								switch(annot.length) {
+									case 2:
+										return [
+											<AnnotationLi annot={annot[0]} is_grouped={true} zoom_to={this.onAnnotationZoomTo} select={this.onAnnotationSelect} />,
+											<AnnotationLi annot={annot[1]} is_grouped={true} zoom_to={this.onAnnotationZoomTo} select={this.onAnnotationSelect} />
+										];
+										break;
+								}
+							}
+							else {
+								return <AnnotationLi annot={annot} zoom_to={this.onAnnotationZoomTo} select={this.onAnnotationSelect} />
+							}
+						});
 					})()}
 				</ul>
 			</div>

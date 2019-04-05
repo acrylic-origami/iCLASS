@@ -45,7 +45,7 @@ export default class extends React.Component {
 			is_annotating: false,
 			is_brushing: false,
 			annotating_id: null,
-			annotating_at: new Date(2018, 5, 4, 21, 55, 58),
+			annotating_at: null,
 			annotation_preview_id: null, // used to pan to annotations
 			px_ratio: window.devicePixelRatio,
 			
@@ -78,6 +78,8 @@ export default class extends React.Component {
 		
 		this.area_ctx = this.area_canvas.current.getContext('2d');
 		this.minimap_ctx = this.minimap_canvas.current.getContext('2d');
+		
+		this.minimap_ctx.strokeStyle = '#000 solid 1px';
 		
 		this.area_ctx.moveTo(0, 0);
 		this.area_ctx.strokeStyle = '#000 solid 1px';
@@ -195,8 +197,8 @@ export default class extends React.Component {
 			            .range([0, wrap_rect.width])
 			            .domain([domain0]);
 			const y = d3.scaleLog()
-			            .range([MINIMAP_HEIGHT, 0])
-			            .domain([1E-3, 10000]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
+			            .range([0, MINIMAP_HEIGHT])
+			            .domain([1E-3, 100]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
 			const x_ax = d3.axisBottom(x),
 			      y_ax = d3.axisLeft(y);
@@ -205,20 +207,28 @@ export default class extends React.Component {
 			const h_y_ax = this.$minimap_area.append('g').attr('class', 'axis axis--y').call(y_ax);
 			
 			const that = this;
-			debugger;
-			this.$minimap_area.selectAll('line')
-			                  .data(this.props.dataset_meta.subsamples)
-			                  .enter()
-			                  .append('line')
-			                  .each(function (d, i) {
-			                  	d3.select(this).attrs({
-				                  	'class': 'minimap-chart-ele',
-				                  	'x1': `${i / that.props.dataset_meta.subsamples.length * 100}%`,
-				                  	'x2': `${i / that.props.dataset_meta.subsamples.length * 100}%`,
-				                  	'y1': y(Math.max(d[0][0] - d[0][1], 1E-2)), // 1-sigma
-				                  	'y2': y(d[0][0] + d[0][1])
-				                  })
-			                  });
+			
+			for(let i = 0; i < this.props.dataset_meta.subsamples[0].length; i++) {
+				const mean = this.props.dataset_meta.subsamples[0][i][0];
+				const std = this.props.dataset_meta.subsamples[1][i][0];
+				const x_px = i / this.props.dataset_meta.subsamples[0].length * wrap_rect.width;
+				this.minimap_ctx.moveTo(x_px * this.state.px_ratio, y(Math.max(mean - std, 1E-3)) * this.state.px_ratio);
+				this.minimap_ctx.lineTo(x_px * this.state.px_ratio, y(mean + std) * this.state.px_ratio);
+			}
+			this.minimap_ctx.stroke();
+			// this.$minimap_area.selectAll('line')
+			//                   .data()
+			//                   .enter()
+			//                   .append('line')
+			//                   .each(function (d, i) {
+			//                   	d3.select(this).attrs({
+			// 	                  	'class': 'minimap-chart-ele',
+			// 	                  	'x1': `${i / that.props.dataset_meta.subsamples.length * 100}%`,
+			// 	                  	'x2': `${i / that.props.dataset_meta.subsamples.length * 100}%`,
+			// 	                  	'y1': y(Math.max(d[0][0] - d[0][1], 1E-2)), // 1-sigma
+			// 	                  	'y2': y(d[0][0] + d[0][1])
+			// 	                  })
+			//                   });
 		})();
 		
 		// zoom to initial annotation if available
@@ -319,7 +329,8 @@ export default class extends React.Component {
 			this.props.onZoom(this.dry_zoom_to_annotation(this.props.annotating_id));
 			this.setState({
 				is_annotating: true,
-				annotating_id: this.props.annotating_id
+				annotating_id: this.props.annotating_id,
+				annotating_at: [this.x(this.props.annotations.get(this.props.annotating_id).get_start()), 100],
 			});
 		}
 	}
@@ -407,9 +418,9 @@ export default class extends React.Component {
 		{ !this.state.is_annotating ? null :
 			<AnnotateView
 				annotation={this.props.annotations.get(this.state.annotating_id) /* for existing annotations */}
-				startTime={this.x.invert(this.state.annotating_at[0][0])}
+				startTime={this.x.invert(this.state.annotating_at[0])}
 				screenPosY={100}
-				screenPosX={this.state.annotating_at[0][0]}
+				screenPosX={this.state.annotating_at[0]}
 				onSubmit={annotation => {
 					const annotating_id = this.state.annotating_id;
 					this.props.onAnnotate(annotation);

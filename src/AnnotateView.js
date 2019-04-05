@@ -69,22 +69,9 @@ export default class extends React.Component {
 		
 		this.props.onSubmit(new AnnotationClass(
 			this.props.annotation ? this.props.annotation.get_start() : this.props.startTime,
-			this.props.annotating_at
+			this.props.annotating_at,
+			this.props.annotation ? this.props.annotation.id : null
 		));
-	}
-
-	isTime = value => {
-		const time = value.split(":");
-		var has_error = false;
-		// check format of time
-		time.map((time, i) => {
-			if(isNaN(time)) has_error = true;
-			else if (parseInt(time) < 0) has_error = true;
-			else if (i == 0 && parseInt(time) > 23) has_error = true;
-			else if (i !== 0 && i !== 3 && parseInt(time) > 59) has_error = true;
-			else if (i == 3 && parseInt(time) > 99) has_error = true;
-		});
-		return time.length > 4 | has_error;
 	}
 
 	render = () =>
