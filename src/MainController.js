@@ -25,7 +25,7 @@ export default class extends React.Component {
 			annotating_nonce: 0,
 			
 			annotation_preview_id: isNaN(maybe_annotation_preview_id) || !annotations.has(maybe_annotation_preview_id) ? null : maybe_annotation_preview_id,
-			annotation_preview_nonce: 0
+			annotation_preview_nonce: 0,
 		};
 	}
 	
@@ -95,26 +95,6 @@ export default class extends React.Component {
 	onZoom = tf => this.setState({ d3_tf: tf });
 	
 	render = () => <div>
-		<div className="d3wrap">
-			<D3Controller
-				dataset_meta={this.props.dataset_meta}
-				patient={this.props.patientID}
-				is_editing={this.state.is_editing}
-				annotations={this.state.annotations}
-				
-				annotating_id={this.state.annotating_id}
-				annotating_nonce={this.state.annotating_id}
-				
-				annotation_preview_id={this.state.annotation_preview_id}
-				annotation_preview_nonce={this.state.annotation_preview_nonce}
-				
-				onAnnotate={this.onAnnotate}
-				tf={this.state.d3_tf}
-				onZoom={this.onZoom}
-				width={960}
-				height={640}
-				/>
-		</div>
 		<div className="brushWrap">
 			<div className="brushInnerWrap">
 				<div className="buttonWrap">
@@ -147,5 +127,21 @@ export default class extends React.Component {
 				</ul>
 			</div>
 		</div>
+		<D3Controller
+			dataset_meta={this.props.dataset_meta}
+			patient={this.props.patientID}
+			is_editing={this.state.is_editing}
+			annotations={this.state.annotations}
+			
+			annotating_id={this.state.annotating_id}
+			annotating_nonce={this.state.annotating_id}
+			
+			annotation_preview_id={this.state.annotation_preview_id}
+			annotation_preview_nonce={this.state.annotation_preview_nonce}
+			
+			onAnnotate={this.onAnnotate}
+			tf={this.state.d3_tf}
+			onZoom={this.onZoom}
+			/>
 	</div>;
 }

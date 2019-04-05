@@ -17,6 +17,7 @@ const channels = [...Array(16).keys()];
 const NUM_CH = channels.length;
 const Y_DOMAIN = [-200, 200]; // TODO make this user-adjustable via props
 const OVERSCALING = 2;
+const MINIMAP_HEIGHT = 100;
 
 export default class extends React.Component {
 	constructor(props) {
@@ -28,6 +29,7 @@ export default class extends React.Component {
 			this.props.dataset_meta
 		);
 		
+		this.wrap = React.createRef(); // for sizing
 		this.svg = React.createRef();
 		this.zoom = React.createRef();
 		this.area = React.createRef();
@@ -45,7 +47,10 @@ export default class extends React.Component {
 			annotating_id: null,
 			annotating_at: new Date(2018, 5, 4, 21, 55, 58),
 			annotation_preview_id: null, // used to pan to annotations
-			px_ratio: window.devicePixelRatio
+			px_ratio: window.devicePixelRatio,
+			
+			width: 960,
+			height: 480 // to be adjusted by size of wrapper element
 		};
 		
 		// D3 STATE
@@ -78,22 +83,23 @@ export default class extends React.Component {
 		this.area_ctx.strokeStyle = '#000 solid 1px';
 		this.area_ctx.fillStyle = '#000';
 		
-		this.$zoom.on("dblclick.zoom", null);
+		this.$zoom.on("dblclick.zoom", null).on('wheel.zoom', null);
 		
 		
 		// TODO account for initial zooms in props
 		// DATA SETUP //
 		
 		// UI SETUP //
+		const wrap_rect = this.wrap.current.getBoundingClientRect();
 		(() => {
 			// yes, there is a race condition against this variable vs. any props change that forces a resampleData
 			this.x0 = d3.scaleTime()
-			            .range([0, +this.$svg.attr('width')])
+			            .range([0, wrap_rect.width])
 			            .domain(this.domain1); // TODO: consider replacing with a representation relative to the whole dataset width
 			this.x = this.x0.copy();
 			
 			this.y = d3.scaleLinear()
-			            .range([+this.$svg.attr('height'), 0])
+			            .range([wrap_rect.height, 0])
 			            .domain(Y_DOMAIN); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
 			this.x_ax = d3.axisBottom(this.x);
@@ -101,6 +107,16 @@ export default class extends React.Component {
 			               
 			this.h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(this.x_ax);
 			const h_y_ax = this.$area.append('g').attr('class', 'axis axis--y').call(y_ax);
+			
+			this.area_canvas.current.width = wrap_rect.width * this.state.px_ratio * OVERSCALING;
+			this.area_canvas.current.height = (wrap_rect.height - MINIMAP_HEIGHT) * this.state.px_ratio;
+			this.area_canvas.current.style.width = `${wrap_rect.width * OVERSCALING}px`;
+			this.area_canvas.current.style.height = `${wrap_rect.height - MINIMAP_HEIGHT}px`;
+			
+			this.minimap_canvas.current.width = wrap_rect.width * this.state.px_ratio;
+			this.minimap_canvas.current.height =  MINIMAP_HEIGHT * this.state.px_ratio;
+			this.minimap_canvas.current.style.width = `${wrap_rect.width}px`;
+			this.minimap_canvas.current.style.height = `${MINIMAP_HEIGHT}px`;
 			
 			// const line = d3.line()
 			//                .curve(d3.curveLinear)
@@ -114,7 +130,7 @@ export default class extends React.Component {
 			//    );
 			
 			this.zoomFunc = d3.zoom()
-			               .extent([[0, 0], [+this.$svg.attr('width'), +this.$svg.attr('height')]])
+			               .extent([[0, 0], [wrap_rect.width, wrap_rect.height]])
 			               .on('zoom', e => {
 			               	// graphics updates + propagation to parent (which will call us again in `zoom_to``)
 			               	if(d3.event.sourceEvent instanceof MouseEvent) {
@@ -127,9 +143,9 @@ export default class extends React.Component {
 			               	}
 			               });
 			
-			this.$zoom.call(this.zoomFunc).on('dblclick.zoom', null);
+			this.$zoom.call(this.zoomFunc).on('dblclick.zoom', null).on('wheel.zoom', null);
 			this.$svg.on("dblclick", () => {
-				debugger;
+				// debugger;
 				this.setState(state_ => ({
 					is_annotating: true,
 					annotating_at: [[d3.event.layerX, d3.event.layerY], [d3.event.clientX, d3.event.clientY]],
@@ -144,18 +160,29 @@ export default class extends React.Component {
 			// 	// buffer[buffer.length - 1]
 			// )
 			// 	.subscribe(this.resampleData);
-
+			// debugger;
 			this.resampleData(this.domain1);
+			
+			window.addEventListener('resize', e => {
+				const wrap_rect = this.wrap.current.getBoundingClientRect();
+				this.x0.range([0, wrap_rect.width]);
+				this.x.range([0, wrap_rect.width]);
+				this.y.range([wrap_rect.height, 0]);
+				this.zoomFunc.extent([[0, 0], [wrap_rect.width, wrap_rect.height]]);
+				
+				this.h_x_ax.call(this.x0);
+				this.h_y_ax.call(this.y);
+			});
 		})();
 		
 		// MINIMAP SETUP
 		(() => {
 			const domain0 = [new Date(this.props.dataset_meta.tstart), this.props.dataset_meta.tstart + this.props.dataset_meta.point_count / this.props.dataset_meta.Fs * 1000];
 			const x = d3.scaleTime()
-			            .range([0, +this.$minimap_svg.attr('width')])
+			            .range([0, wrap_rect.width])
 			            .domain([domain0]);
 			const y = d3.scaleLog()
-			            .range([+this.$minimap_svg.attr('height'), 0])
+			            .range([MINIMAP_HEIGHT, 0])
 			            .domain([1E-3, 10000]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
 			const x_ax = d3.axisBottom(x),
@@ -189,8 +216,8 @@ export default class extends React.Component {
 		if(!Array.isArray(domain))
 			domain = [domain, domain];
 		
-		return (this.x0(domain[0]) - this.px_offset) > 0 && (this.x0(domain[0]) - this.px_offset) < this.props.width ||
-			(this.x0(domain[1]) - this.px_offset) > 0 && (this.x0(domain[1]) - this.px_offset) < this.props.width;
+		return (this.x0(domain[0]) - this.px_offset) > 0 && (this.x0(domain[0]) - this.px_offset) < this.state.width ||
+			(this.x0(domain[1]) - this.px_offset) > 0 && (this.x0(domain[1]) - this.px_offset) < this.state.width;
 	}
 	dry_zoom_to_annotation(id) {
 		const annotation_time = this.props.annotations.get(id).get_start();
@@ -360,7 +387,7 @@ export default class extends React.Component {
 		// debugger;
 	}
 
-	render = () => <div>
+	render = () => <div ref={this.wrap} className="d3wrap">
 		{ !this.state.is_annotating ? null :
 			<AnnotateView
 				annotation={this.props.annotations.get(this.state.annotating_id) /* for existing annotations */}
@@ -383,17 +410,9 @@ export default class extends React.Component {
 			/>
 		}
 		<div className="plot-container">
-			<canvas
-				className="plot" ref={this.area_canvas}
-				width={this.props.width * this.state.px_ratio * OVERSCALING}
-				height={this.props.height * this.state.px_ratio}
-				style={{
-					width: `${this.props.width * OVERSCALING}px`,
-					height: `${this.props.height}px`,
-				}}
-			/>
+			<canvas className="plot" ref={this.area_canvas} />
 		</div>
-		<svg className="plot" ref={this.svg} width={this.props.width} height={this.props.height}>
+		<svg className="plot" ref={this.svg}>
 			<g ref={this.area}></g>
 			<g className="brushes" ref={this.gBrushes}>
 				{group_point_annotations(this.props.annotations.toList()).map((a, i) => {
@@ -406,10 +425,10 @@ export default class extends React.Component {
 					/>
 				})}
 			</g>
-			<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} width={this.props.width} height={this.props.height} ref={this.zoom} />
+			<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} ref={this.zoom} />
 		</svg>
-		<canvas ref={this.minimap_canvas} style={{ width: `${this.props.width}px`, height: `${this.props.height}px` }} width={this.props.width * this.state.px_ratio} height={100 * this.state.px_ratio}></canvas>
-		<svg ref={this.minimap_svg} width={this.props.width} height={100}>
+		<canvas ref={this.minimap_canvas} id="minimap_canvas"></canvas>
+		<svg ref={this.minimap_svg} width={this.state.width} height={MINIMAP_HEIGHT}>
 			<g ref={this.minimap_area} />
 		</svg>
 	</div>
