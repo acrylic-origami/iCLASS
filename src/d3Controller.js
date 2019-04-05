@@ -92,21 +92,16 @@ export default class extends React.Component {
 		// UI SETUP //
 		const wrap_rect = this.wrap.current.getBoundingClientRect();
 		(() => {
-			// yes, there is a race condition against this variable vs. any props change that forces a resampleData
-			this.x0 = d3.scaleTime()
-			            .range([0, wrap_rect.width])
-			            .domain(this.domain1); // TODO: consider replacing with a representation relative to the whole dataset width
-			this.x = this.x0.copy();
 			
-			this.y = d3.scaleLinear()
-			            .range([wrap_rect.height, 0])
-			            .domain(Y_DOMAIN); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
-
-			this.x_ax = d3.axisBottom(this.x);
-			const y_ax = d3.axisLeft(this.y);
-			               
-			this.h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(this.x_ax);
-			const h_y_ax = this.$area.append('g').attr('class', 'axis axis--y').call(y_ax);
+			// size all DOM elements foremost
+			this.zoom.current.setAttribute('width', `${wrap_rect.width}px`);
+			this.zoom.current.setAttribute('height', `${wrap_rect.height - MINIMAP_HEIGHT}px`);
+			
+			this.svg.current.setAttribute('width', `${wrap_rect.width}px`);
+			this.svg.current.setAttribute('height', `${wrap_rect.height - MINIMAP_HEIGHT}px`);
+			this.svg.current.style.width = `${wrap_rect.width}px`;
+			this.svg.current.style.height = `${wrap_rect.height - MINIMAP_HEIGHT}px`;
+			this.minimap_svg.current.style.width = `${wrap_rect.width}px`;
 			
 			this.area_canvas.current.width = wrap_rect.width * this.state.px_ratio * OVERSCALING;
 			this.area_canvas.current.height = (wrap_rect.height - MINIMAP_HEIGHT) * this.state.px_ratio;
@@ -117,6 +112,23 @@ export default class extends React.Component {
 			this.minimap_canvas.current.height =  MINIMAP_HEIGHT * this.state.px_ratio;
 			this.minimap_canvas.current.style.width = `${wrap_rect.width}px`;
 			this.minimap_canvas.current.style.height = `${MINIMAP_HEIGHT}px`;
+			
+			
+			// yes, there is a race condition against this variable vs. any props change that forces a resampleData
+			this.x0 = d3.scaleTime()
+			            .range([0, wrap_rect.width])
+			            .domain(this.domain1); // TODO: consider replacing with a representation relative to the whole dataset width
+			this.x = this.x0.copy();
+			
+			this.y = d3.scaleLinear()
+			            .range([wrap_rect.height - MINIMAP_HEIGHT, 0])
+			            .domain(Y_DOMAIN); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
+
+			this.x_ax = d3.axisBottom(this.x);
+			this.y_ax = d3.axisLeft(this.y);
+			               
+			this.h_x_ax = this.$area.append('g').attr('class', 'axis axis--x').call(this.x_ax);
+			this.h_y_ax = this.$area.append('g').attr('class', 'axis axis--y').call(this.y_ax);
 			
 			// const line = d3.line()
 			//                .curve(d3.curveLinear)
@@ -133,6 +145,7 @@ export default class extends React.Component {
 			               .extent([[0, 0], [wrap_rect.width, wrap_rect.height]])
 			               .on('zoom', e => {
 			               	// graphics updates + propagation to parent (which will call us again in `zoom_to``)
+			               	// console.log(d3.event.transform);
 			               	if(d3.event.sourceEvent instanceof MouseEvent) {
 				               	const new_domain = d3.event.transform.rescaleX(this.x0).domain();
 				               	
@@ -170,8 +183,8 @@ export default class extends React.Component {
 				this.y.range([wrap_rect.height, 0]);
 				this.zoomFunc.extent([[0, 0], [wrap_rect.width, wrap_rect.height]]);
 				
-				this.h_x_ax.call(this.x0);
-				this.h_y_ax.call(this.y);
+				this.h_x_ax.call(this.x_ax);
+				this.h_y_ax.call(this.y_ax);
 			});
 		})();
 		
@@ -192,6 +205,7 @@ export default class extends React.Component {
 			const h_y_ax = this.$minimap_area.append('g').attr('class', 'axis axis--y').call(y_ax);
 			
 			const that = this;
+			debugger;
 			this.$minimap_area.selectAll('line')
 			                  .data(this.props.dataset_meta.subsamples)
 			                  .enter()
@@ -313,7 +327,7 @@ export default class extends React.Component {
 	/* protected */
 	move_brush(annotation) {
 		const brush = d3.brushX()
-		    .extent([[0, 0], [0, +this.$svg.attr('height')]])
+		    .extent([[0, 0], [0, this.area_canvas.current.height / this.state.px_ratio]])
 		    .on("start", _ => this.setState({ is_brushing: true }))
 		    // .on("brush", function() { console.log(arguments, this); })
 		    .on("end", () => {
@@ -351,7 +365,8 @@ export default class extends React.Component {
 					// Move the brush to the startTime and endTime
 					if($gBrush.select('rect').size() === 0)
 						$gBrush.call(brush)
-						
+					
+					// debugger;
 					$gBrush.call(brush.move, [ annotation[0].get_start(), annotation[1].get_start() ].map(this.x));
 					break;
 				default:
@@ -368,7 +383,8 @@ export default class extends React.Component {
 			// console.log(this.domain1, annotation.get_start(), this.x0(annotation.get_start()), this.x0(annotation.get_start()) + 2, brush_(annotation).extent);
 			if($gBrush.select('rect').size() === 0)
 				$gBrush.call(brush)
-				
+			
+			// debugger;	
 			$gBrush.call(brush.move, [this.x(annotation.get_start()), this.x(annotation.get_start()) + 2]);
 			
 			$gBrush.selectAll('.brush>.handle').remove();
@@ -393,7 +409,7 @@ export default class extends React.Component {
 				annotation={this.props.annotations.get(this.state.annotating_id) /* for existing annotations */}
 				startTime={this.x.invert(this.state.annotating_at[0][0])}
 				screenPosY={100}
-				screenPosX={this.state.annotating_at[1][0]}
+				screenPosX={this.state.annotating_at[0][0]}
 				onSubmit={annotation => {
 					const annotating_id = this.state.annotating_id;
 					this.props.onAnnotate(annotation);
@@ -427,8 +443,8 @@ export default class extends React.Component {
 			</g>
 			<rect id="zoom" className="zoom" style={{ display: this.props.is_editing ? 'none' : 'block' }} ref={this.zoom} />
 		</svg>
-		<canvas ref={this.minimap_canvas} id="minimap_canvas"></canvas>
-		<svg ref={this.minimap_svg} width={this.state.width} height={MINIMAP_HEIGHT}>
+		<canvas ref={this.minimap_canvas} id="minimap_canvas" style={{ height:`${MINIMAP_HEIGHT}px` }}></canvas>
+		<svg ref={this.minimap_svg} height={MINIMAP_HEIGHT} id="minimap_svg">
 			<g ref={this.minimap_area} />
 		</svg>
 	</div>
