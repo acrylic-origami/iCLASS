@@ -1,5 +1,5 @@
 import React from 'react';
-import * as d3 from 'd3';
+import * as d3 from './d3';
 import * as dateFormat from 'dateFormat';
 import * as d3_multi from 'd3-selection-multi';
 

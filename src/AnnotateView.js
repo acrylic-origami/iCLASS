@@ -89,8 +89,8 @@ export default class extends React.Component {
 
 	render = () =>
 		<div className='annotation-edit'>
-			<div className='annotationBar' style={{ left: `${this.props.left_px}px` }}></div>
-			<div className="annotation-menu" style={{ left: `${this.props.left_px}px` }}>
+			<div className='annotationBar' style={{ left: `${this.props.screenPosX}px` }}></div>
+			<div className="annotation-menu" style={{ left: `${this.props.screenPosX}px` }}>
 				<div>
 					<div style={this.titleStyle}>
 						{(this.props.annotation == null) ? 'New' : 'Edit'} Annotation

@@ -12,10 +12,20 @@ interface RangeBrush {
 interface SeizureBrush extends RangeBrush {}
 */
 
+import {data_name} from './Util/AnnotationTypeNames';
+
 class Annotation {
 	set_id(id) { this.id = id; }
 	get_start() { /* abstract */ }
 	update_with_selection(selection) { /* abstract */ console.log(arguments); }
+	serialize() {
+		return {
+			id: this.id,
+			type: data_name(this),
+			startTime: this.get_start(),
+			notes: this.notes
+		};
+	}
 }
 class PointBrush extends Annotation {
 	constructor(start, notes, id = null) {
@@ -27,6 +37,9 @@ class PointBrush extends Annotation {
 	}
 	get_start() { return this.start; }
 	update_with_selection(selection) { this.start = selection[0]; }
+	static make(a) {
+		return new this(new Date(a.startTime), a.notes, parseInt(a.id));
+	}
 }
 class OnsetBrush extends PointBrush {}
 class OffsetBrush extends PointBrush {}

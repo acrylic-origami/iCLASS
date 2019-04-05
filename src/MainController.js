@@ -1,25 +1,30 @@
 import React from 'react';
+import Q from 'q';
 import {Map} from 'immutable';
 import { Link } from "react-router-dom";
 import D3Controller from './d3Controller';
-import {view_name, data_name} from './Util/AnnotationTypeNames';
+import * as d3 from './d3';
+import {view_name, data_name, data_name_to_class} from './Util/AnnotationTypeNames';
 
 import {PointBrush, OnsetBrush, OffsetBrush, RangeBrush, SeizureBrush} from './Annotations';
 
 export default class extends React.Component {
 	constructor(props) {
+		const maybe_annotation_preview_id = parseInt(new URL(document.location).hash.slice(1));
+		
 		super(props); // props: initial: [dataset, [start, range]]
+		const annotations = new Map(this.props.dataset_meta.annotations.map(([id, a]) => [id, data_name_to_class(a.type).make(a)]));
 		this.state = {
 			is_editing: false,
 			d3_tf: null,
 			
-			annotation_idx: 0,
-			annotations: new Map(),
+			annotation_idx: Math.max.apply(null, [-1].concat(this.props.dataset_meta.annotations.map(([id, a]) => a.id))) + 1,
+			annotations,
 			
 			annotating_id: null,
 			annotating_nonce: 0,
 			
-			annotation_preview_id: null,
+			annotation_preview_id: isNaN(maybe_annotation_preview_id) || !annotations.has(maybe_annotation_preview_id) ? null : maybe_annotation_preview_id,
 			annotation_preview_nonce: 0
 		};
 	}
@@ -28,33 +33,9 @@ export default class extends React.Component {
 		is_editing: !state_.is_editing
 	}));
 
-	// Saves results from new annotation form
-	// AND updates brushes
-	addAnnotation = d => {
-		const newAnnotations = this.state.annotations;
-		if(d.is_new) {
-			newAnnotations.push({startTime: d.startTime, type: d.type, notes: d.notes});
-		} else {
-			newAnnotations[d.annot_id].startTime = d.startTime;
-			newAnnotations[d.annot_id].type = d.type;
-			newAnnotations[d.annot_id].notes = d.notes;
-		}
-		
-		newAnnotations.sort((a, b) => a.startTime - b.startTime);
-		this.annotationsToBrushes(newAnnotations);
-		this.setState(state_ => ({
-			annotations: newAnnotations,
-			screenPosY: 0,
-			screenPosX: 0,
-			is_annotating: false,
-			startTime: null,
-			endTime: null,
-			newAnnotationId: state_.newAnnotationId + 1
-		}));
-	};
-
 	// Updates the start times of annotations that were edited via the brushes
 	onAnnotate = annotation => {
+		const D = Q.defer();
 		if(annotation.id == null) {
 			// new annotation
 			this.setState(state_ => {
@@ -64,6 +45,8 @@ export default class extends React.Component {
 					// debugger;
 					return state_.annotations.set(state_.annotation_idx, annotation);
 				})();
+				console.log(state_.annotation_idx);
+				D.resolve(annotation);
 				return {
 					annotation_idx: state_.annotation_idx + 1,
 					annotations: next_annotations
@@ -71,15 +54,26 @@ export default class extends React.Component {
 			});
 		}
 		else {
-			this.setState(state_ => console.log(annotation, state_.annotations.get(annotation.id)) || ({
+			this.setState(state_ => ({
 				annotations: state_.annotations.has(annotation.id) ? state_.annotations.set(annotation.id, annotation) : state_.annotations
 			}));
+			D.resolve(annotation);
 		}
+		
+		D.promise.then(annotation => d3.json('/save_annotation', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				patient: this.props.patientID,
+				dataset: this.props.dataset_meta.dataset,
+				annotation: annotation.serialize()
+			})
+		}).then(console.log, console.log));
 	};
 	
 	onAnnotationZoomTo = e => {
 		// TODO check if this is handleable by React Router
-		const annotation_id = parseInt(document.location.hash.slice(1));
+		const annotation_id = parseInt((new URL(e.currentTarget.href)).hash.slice(1));
 		this.setState(state_ => ({
 			annotation_preview_id: annotation_id,
 			annotation_preview_nonce: state_.annotation_preview_nonce + 1
@@ -89,7 +83,7 @@ export default class extends React.Component {
 	
 	onAnnotationSelect = e => {
 		this.setState(state_ => ({
-			annotating_id: parseInt((new URL(e.target.href)).hash.slice[1]),
+			annotating_id: parseInt((new URL(e.currentTarget.href)).hash.slice[1]),
 			annotating_nonce: state_.annotating_nonce + 1
 		}));
 	}
@@ -104,6 +98,7 @@ export default class extends React.Component {
 		<div className="d3wrap">
 			<D3Controller
 				dataset_meta={this.props.dataset_meta}
+				patient={this.props.patientID}
 				is_editing={this.state.is_editing}
 				annotations={this.state.annotations}
 				

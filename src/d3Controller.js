@@ -24,7 +24,8 @@ export default class extends React.Component {
 		// basic dataset dataset_meta is also included here
 		
 		this.data_controller = new DataController(
-			props.dataset_meta
+			this.props.patient,
+			this.props.dataset_meta
 		);
 		
 		this.svg = React.createRef();
@@ -39,7 +40,7 @@ export default class extends React.Component {
 		this.area_canvas = React.createRef();
 		
 		this.state = {
-			is_annotating: true,
+			is_annotating: false,
 			is_brushing: false,
 			annotating_id: null,
 			annotating_at: new Date(2018, 5, 4, 21, 55, 58),
@@ -127,11 +128,11 @@ export default class extends React.Component {
 			               });
 			
 			this.$zoom.call(this.zoomFunc).on('dblclick.zoom', null);
-			
-			this.$svg.on("dblclick", e => {
+			this.$svg.on("dblclick", () => {
+				debugger;
 				this.setState(state_ => ({
 					is_annotating: true,
-					annotating_at: this.x.invert(d3.event.layerX),
+					annotating_at: [[d3.event.layerX, d3.event.layerY], [d3.event.clientX, d3.event.clientY]],
 					left_px: d3.event.clientX,
 					annotating_id: null
 				}));
@@ -178,6 +179,32 @@ export default class extends React.Component {
 				                  })
 			                  });
 		})();
+		
+		// zoom to initial annotation if available
+		if(this.props.annotation_preview_id != null)
+			this.props.onZoom(this.dry_zoom_to_annotation(this.props.annotation_preview_id));
+	}
+	
+	is_visible(domain) {
+		if(!Array.isArray(domain))
+			domain = [domain, domain];
+		
+		return (this.x0(domain[0]) - this.px_offset) > 0 && (this.x0(domain[0]) - this.px_offset) < this.props.width ||
+			(this.x0(domain[1]) - this.px_offset) > 0 && (this.x0(domain[1]) - this.px_offset) < this.props.width;
+	}
+	dry_zoom_to_annotation(id) {
+		const annotation_time = this.props.annotations.get(id).get_start();
+		const zoom = d3.zoomTransform(this.$zoom.node());
+		if(!this.is_visible(annotation_time)) {
+			const annotation_px = [
+				this.x(new Date(annotation_time.getTime() - FULL_RES_INTERVAL / 2 * 1000)),
+				this.x(new Date(annotation_time.getTime() + FULL_RES_INTERVAL / 2 * 1000))
+			];
+			return zoom.translate(-Math.round(annotation_px[0]), 0);
+		}
+		else {
+			return zoom;
+		}
 	}
 	
 	componentDidUpdate(prevProps, prevState) {
@@ -241,35 +268,14 @@ export default class extends React.Component {
 		}
 		
 		// evented canvas moving
-		const is_visible = domain => {
-			if(!Array.isArray(domain))
-				domain = [domain, domain];
-			
-			return (this.x0(domain[0]) - this.px_offset) > 0 && (this.x0(domain[0]) - this.px_offset) < this.props.width ||
-				(this.x0(domain[1]) - this.px_offset) > 0 && (this.x0(domain[1]) - this.px_offset) < this.props.width;
-		};
-		const dry_zoom_to_annotation = id => {
-			const annotation_time = this.props.annotations.get(id).get_start();
-			const zoom = d3.zoomTransform(this.$zoom.node());
-			if(!is_visible(annotation_time)) {
-				const annotation_px = [
-					this.x(new Date(annotation_time.getTime() - FULL_RES_INTERVAL / 2 * 1000)),
-					this.x(new Date(annotation_time.getTime() + FULL_RES_INTERVAL / 2 * 1000))
-				];
-				return zoom.translate(-Math.round(annotation_px[0]), 0);
-			}
-			else {
-				return zoom;
-			}
-		}
-		
 		if(this.props.annotation_preview_id != null && this.props.annotation_preview_nonce !== prevProps.annotation_preview_nonce) {
-			this.props.onZoom(dry_zoom_to_annotation(this.props.annotation_preview_id));
+			console.log(this.props.annotation_preview_id);
+			this.props.onZoom(this.dry_zoom_to_annotation(this.props.annotation_preview_id));
 		}
 		
 		if(this.props.annotating_id != null && this.props.annotating_nonce !== prevProps.annotating_nonce) {
 			// this.zoom_to(d3.transform.)
-			this.props.onZoom(dry_zoom_to_annotation(this.props.annotating_id));
+			this.props.onZoom(this.dry_zoom_to_annotation(this.props.annotating_id));
 			this.setState({
 				is_annotating: true,
 				annotating_id: this.props.annotating_id
@@ -358,9 +364,9 @@ export default class extends React.Component {
 		{ !this.state.is_annotating ? null :
 			<AnnotateView
 				annotation={this.props.annotations.get(this.state.annotating_id) /* for existing annotations */}
-				startTime={this.state.annotating_at}
-				screenPosY={this.state.screenPosY}
-				screenPosX={this.state.screenPosX}
+				startTime={this.x.invert(this.state.annotating_at[0][0])}
+				screenPosY={100}
+				screenPosX={this.state.annotating_at[1][0]}
 				onSubmit={annotation => {
 					const annotating_id = this.state.annotating_id;
 					this.props.onAnnotate(annotation);

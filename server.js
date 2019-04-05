@@ -2,7 +2,9 @@ const hdf5 = require('hdf5').hdf5;
 const h5lt = require('hdf5').h5lt;
 const express = require('express');
 const path = require('path');
-const { lstatSync, readdirSync } = require('fs');
+const { lstatSync, readdirSync, existsSync, createReadStream } = require('fs');
+const createCsvWriter = require('csv-writer').createObjectCsvWriter;
+const csv = require('csv-parser');
 const app = express();
 const Frac = require('fraction.js');
 const { FULL_RES_INTERVAL } = require('./src/consts.js');
@@ -23,6 +25,17 @@ const data = new Map([ // TEMP
 	// 	f_aux, g_aux
 	// ]],
 ]);
+Map.prototype.flatten = function() {
+	const r = [];
+	for(const [k, v] of this)
+		r.push([k, v]);
+
+	return r;
+}
+
+function data_id(patient, dataset) {
+	return `${patient}/${dataset}`;
+}
 
 // Fetch directory names in directory 'source'
 const isDirectory = source => lstatSync(source).isDirectory();
@@ -33,19 +46,42 @@ const isMat = source => path.extname(source).toLowerCase() == '.mat';
 const getMatFiles = source =>
   		readdirSync(source).map(name => path.join(source, name)).filter(isMat).map(x => path.win32.basename(x));
 
-function add_dataset(dataset) {
-	const f_aux = new hdf5.File(`${process.argv[2]}/${dataset.substring(0, dataset.length - 4)}.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
+function add_dataset(patient, dataset) {
+	const patient_root = `${process.argv[2]}/${patient}`;
+	const f_aux = new hdf5.File(`${patient_root}/${dataset.substring(0, dataset.length - 4)}.comp.h5`, require('hdf5/lib/globals.js').ACC_RDONLY)
 	const g_aux = f_aux.openGroup('data');
 
-	const f = new hdf5.File(`${process.argv[2]}/${dataset.substring(0, dataset.length - 4)}.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
+	const f = new hdf5.File(`${patient_root}/${dataset.substring(0, dataset.length - 4)}.mat`, require('hdf5/lib/globals.js').ACC_RDONLY)
 	const g = f.openGroup('data');
 	const Fs = h5lt.readDataset(g.id, 'Fs');
 	const tstart = Date.parse(String.fromCharCode.apply(null, h5lt.readDataset(g.id, 'tstart')).replace('-', ' '));
 	
-	data.set(dataset, [
-		f, g, Fs[0], tstart,
-		f_aux, g_aux
-	]);
+   return new Promise(resolve => {
+		const results = new Map();
+		const annotation_path = path.join(`${process.argv[2]}/${patient}/${dataset}_annotations.csv`);
+		
+		if(existsSync(annotation_path)) {
+			createReadStream(annotation_path)
+			  .pipe(csv())
+			  .on('data', ({id, ...rest}) => {
+			    results.set(id, Object.assign({}, rest, { id }));
+			  })
+			  .on('end', () => {
+			    resolve(results);
+			  });
+		}
+		else {
+			// defer actually creating it for the first annotations being sent in; it overwrites anyways
+			// when this moves to diffs, then we'll have to create it here
+			resolve(results);
+		}
+	}).then(annotations => data.set(data_id(patient, dataset), [
+			f, g, Fs[0], tstart,
+			f_aux, g_aux, annotations
+		]), // TODO this is really bloating; turn to object so we can reference fields instead of indices
+	console.log);
+	
+	
 }
 
 function unflatten(buf, dims, dtype='f', idx=[]) {
@@ -135,7 +171,7 @@ app.get('/data', (req, res) => {
 	// CONSISTENCY RULE: lower limit is included if equal; upper limit is excluded if equal
 	// expect req.query.zoom, req.query.start_N, req.query.start_D, req.query.end_N, req.query.end_D
 	// also expect (2^-zoom) divides (start - end)
-	const meta = data.get(req.query.dataset);
+	const meta = data.get(data_id(req.query.patient, req.query.dataset));
 	const dims = meta[0].getDatasetDimensions('/data/signal');
 	
 	const frac_start = (parseInt(req.query.start_N) * parseInt(req.query.start_D) > 0) ? 
@@ -166,75 +202,81 @@ app.get('/data', (req, res) => {
 	}
 	res.send(new_chunks); // let the client figure out the timings
 })
-// TODO some redundancy in the data methods: fix later
-app.get('/annotation', (req, res) => {
-	res.send({ dataset: 'EDMSE_pat_FR_1096_050.mat', start: 4, range: 2 });
-})
 
 app.get('/dataset_meta', (req, res) => {
 	// TODO: annotation <-> dataset
-	
-	if(!data.has(req.query.dataset)) add_dataset(req.query.dataset);
-	
-	const meta = data.get(req.query.dataset);
-	const dims = meta[4].getDatasetDimensions('data/subsamples');
-	const flat_subsamples_buf = h5lt.readDatasetAsBuffer(meta[5].id, 'subsamples');
-	res.send({
-		point_count: meta[0].getDatasetDimensions('/data/signal')[0],
-		Fs: meta[2],
-		tstart: meta[3],
-		subsamples: unflatten(flat_subsamples_buf.buffer, dims)
-	});
+	const id = data_id(req.query.patient, req.query.dataset);
+	(!data.has(id) ? add_dataset(req.query.patient, req.query.dataset) : Promise.resolve()).then(() => {
+		const meta = data.get(id);
+		const dims = meta[4].getDatasetDimensions('data/subsamples');
+		const flat_subsamples_buf = h5lt.readDatasetAsBuffer(meta[5].id, 'subsamples');
+		res.send({
+			point_count: meta[0].getDatasetDimensions('/data/signal')[0],
+			Fs: meta[2],
+			tstart: meta[3],
+			subsamples: unflatten(flat_subsamples_buf.buffer, dims),
+			annotations: meta[6].flatten()
+		});
+	})
 })
 
 app.get('/get_patients', (req, res) => {
-  	const directories = getDirectories(path.join(__dirname +'/patient_data/'));
+  	const directories = getDirectories(path.join(`${process.argv[2]}/`));
 	res.send({patients: directories});
 })
 
 app.get('/get_datasets', (req, res) => {
-  	const datasets = getMatFiles(path.join(__dirname +'/patient_data/' + req.query.patientId));
+  	const datasets = getMatFiles(path.join(`${process.argv[2]}/${req.query.patientId}`));
 	var previous_time = 0;
 	var time_covered = 0;
 	datasets.map((dataset, index) => {
-		if(!data.has(dataset)) add_dataset(dataset);
-		
-		const meta = data.get(dataset);
+		const id = data_id(req.query.patientId, dataset);
+		(!data.has(id) ? add_dataset(req.query.patientId, dataset) : Promise.resolve()).then(() => {
+			const meta = data.get(id);
+			datasets[index] = {
+				title: datasets[index],
+				start:  previous_time + meta[3], // tstart
+				end: previous_time + meta[3] + (meta[0].getDatasetDimensions('/data/signal')[0])*(1000/meta[2]) // point_count * (1000/Fs)
+			};
 
-		datasets[index] = {
-			title: datasets[index],
-			start:  previous_time + meta[3], // tstart
-			end: previous_time + meta[3] + (meta[0].getDatasetDimensions('/data/signal')[0])*(1000/meta[2]) // point_count * (1000/Fs)
-		};
+			previous_time += ((index == 1) ? 2 : 1) * (datasets[index].end - datasets[index].start);
+			time_covered += (datasets[index].end - datasets[index].start);
 
-		previous_time += ((index == 1) ? 2 : 1) * (datasets[index].end - datasets[index].start);
-		time_covered += (datasets[index].end - datasets[index].start);
-
-		if(index == datasets.length - 1) {
-			datasets.sort((a, b) => {
-			  return a.start - b.start;
-			});
-			res.send({
-				datasets: datasets,
-				min_start: datasets[0].start,
-				max_end: Math.max.apply(Math, datasets.map(o => o.end)),
-				cover: time_covered/(Math.max.apply(Math, datasets.map(o => o.end)) - datasets[0].start)
-			});
-		}
+			if(index == datasets.length - 1) {
+				datasets.sort((a, b) => {
+				  return a.start - b.start;
+				});
+				res.send({
+					datasets: datasets,
+					min_start: datasets[0].start,
+					max_end: Math.max.apply(Math, datasets.map(o => o.end)),
+					cover: time_covered/(Math.max.apply(Math, datasets.map(o => o.end)) - datasets[0].start)
+				});
+			}
+		});
 	});
 })
 
 app.use(express.static('public'));
 
-app.get('/load_annotations', (req, res) => {
-	const results = ann_server.loadAnnotations(req.query.patientId, req.query.dataset).then((results) => {
-		res.send({ results: results});
+app.post('/save_annotation', (req, res) => {
+	// add_dataset('P0', 'EDMSE_pat_FR_1096_002.mat').then(() => {
+	// const req = { body: { patient: 'P0', dataset: 'EDMSE_pat_FR_1096_002.mat', annotation: { id: 0, type: 'onset', startTime: '2018-06-05T01:55:58.000Z', notes: '' } } }
+	const csvWriter = createCsvWriter({  
+	  path: path.join(`${process.argv[2]}/${req.body.patient}/${req.body.dataset}_annotations.csv`),
+	  header: [
+	    {id: 'id', title: 'id'},
+	    {id: 'type', title: 'type'},
+	    {id: 'startTime', title: 'startTime'},
+	    {id: 'notes', title: 'notes'}
+	  ]
 	});
-})
-
-app.post('/save_annotations', (req, res) => {
-	ann_server.annotToCSV(req.body.patient, req.body.dataset, req.body.annotations);
-	res.send({success: true});
+	const meta = data.get(data_id(req.body.patient, req.body.dataset));
+	meta[6].set(req.body.annotation.id, req.body.annotation);
+	csvWriter
+	  .writeRecords(meta[6].flatten().map(([k, v]) => v))
+	  .then(() => res.send({success: true}));
+	// });
 })
 
 // For react-router

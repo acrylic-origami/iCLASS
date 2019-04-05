@@ -18,3 +18,13 @@ export function data_name(annot) {
 		case PointBrush: return "point";
 	}
 }
+
+export function data_name_to_class(name) {
+	switch(name) {
+		case "onset": return OnsetBrush;
+		case "offset": return OffsetBrush;
+		case "seizure": return SeizureBrush;
+		case "range": return RangeBrush;
+		case "point": return PointBrush;
+	}
+}

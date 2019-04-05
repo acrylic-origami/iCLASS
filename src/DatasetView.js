@@ -19,26 +19,19 @@ export default class extends React.Component {
 		const params = new URLSearchParams(document.location.search.substring(1));
 		const hash = document.location.hash.substring(1);
 
-		const maybe_annotation = params.get('annotation');
-		// const maybe_dataset = params.get('dataset');
 		const maybe_dataset = params.get('dataset');
 		const F_initial = (() => {
-			if(maybe_annotation != null || maybe_dataset != null) {
+			if(maybe_dataset != null) {
 				return (() => {
+					// TODO: make manual-set start and range live in history (when we have the functionality)
 					const maybe_start = params.get('start');
-					const maybe_range = params.get('range');
-					if(maybe_annotation != null) {
-						return d3.json(`/annotation?id=${maybe_annotation}`); // expect server to also fetch dataset metadata
-					}
-					else {
-						return d3.json(`/dataset_meta?dataset=${maybe_dataset}`).then(d => Object.assign({}, d, {
-							dataset: maybe_dataset,
-							start: parseFloat(maybe_start) || 0,
-							// range: d.point_count / d.Fs - EPS
-						}));
-						// TODO URGENT make this case work
-						// F_meta.then({ point_count, Fs } => D.resolve([maybe_dataset, [0, point_count / Fs]])); // beware of numerical inaccuracy!
-					}
+					// const maybe_range = params.get('range');
+					
+					return d3.json(`/dataset_meta?dataset=${maybe_dataset}&patient=${this.props.patientID}`).then(d => Object.assign({}, d, {
+						dataset: maybe_dataset,
+						start: parseFloat(maybe_start) || 0,
+						// range: d.point_count / d.Fs - EPS
+					}));
 				})();
 			}
 			else {

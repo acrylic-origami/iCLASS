@@ -5,8 +5,9 @@ import { Map, Set } from 'immutable';
 import { FULL_RES_INTERVAL } from './consts';
 
 export default class {
-	constructor(dataset_meta) {
+	constructor(patient, dataset_meta) {
 		// StampedData := Array<float, Array<float>>
+		this.patient = patient;
 		this.dataset_meta = dataset_meta;
 		this.chunks = (new Map()).asMutable(); // Map<idx: int, StampedData>
 		this.visible_chunks = (new Set()).asMutable();
@@ -17,7 +18,7 @@ export default class {
 	}
 	
 	/* protected */
-	request = (zoom, start, end) => d3.json(`data?dataset=${this.dataset_meta.dataset}&zoom=${zoom}&start_N=${start.n}&start_D=${start.d}&end_N=${end.n}&end_D=${end.d}`);
+	request = (zoom, start, end) => d3.json(`data?patient=${this.patient}&dataset=${this.dataset_meta.dataset}&zoom=${zoom}&start_N=${start.n}&start_D=${start.d}&end_N=${end.n}&end_D=${end.d}`);
 	
 	/* protected */
 	fetch_new_data(domain) {
