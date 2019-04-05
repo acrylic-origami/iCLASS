@@ -1,6 +1,6 @@
 import React from 'react';
 import Q from 'q';
-import * as d3 from 'd3';
+import * as d3 from './d3';
 import {EPS} from './consts';
 import MainController from './MainController';
 
