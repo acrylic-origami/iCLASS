@@ -197,7 +197,7 @@ export default class extends React.Component {
 			            .domain([domain0]);
 			const y = d3.scaleLog()
 			            .range([0, MINIMAP_HEIGHT])
-			            .domain([1E-3, 100]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
+			            .domain([1E5, 1E3]); // d3.extent(channels.map(ch => flat_data.map(packet => packet[1][ch])).reduce((acc, packet) => acc.concat(packet))));
 
 			const x_ax = d3.axisBottom(this.minimap_x),
 			      y_ax = d3.axisLeft(y);
@@ -214,26 +214,16 @@ export default class extends React.Component {
 			const that = this;
 			
 			for(let i = 0; i < this.props.dataset_meta.subsamples[0].length; i++) {
-				const mean = this.props.dataset_meta.subsamples[0][i][0];
-				const std = this.props.dataset_meta.subsamples[1][i][0];
+				const range = [
+					this.props.dataset_meta.subsamples[0][i][0],
+					this.props.dataset_meta.subsamples[1][i][0]
+				]; // 5th % -- 95th %
+				
 				const x_px = i / this.props.dataset_meta.subsamples[0].length * wrap_rect.width;
-				this.minimap_ctx.moveTo(x_px * this.state.px_ratio, y(Math.max(mean - std, 1E-3)) * this.state.px_ratio);
-				this.minimap_ctx.lineTo(x_px * this.state.px_ratio, y(mean + std) * this.state.px_ratio);
+				this.minimap_ctx.moveTo(x_px * this.state.px_ratio, y(range[0]) * this.state.px_ratio);
+				this.minimap_ctx.lineTo(x_px * this.state.px_ratio, y(range[1]) * this.state.px_ratio);
 			}
 			this.minimap_ctx.stroke();
-			// this.$minimap_area.selectAll('line')
-			//                   .data()
-			//                   .enter()
-			//                   .append('line')
-			//                   .each(function (d, i) {
-			//                   	d3.select(this).attrs({
-			// 	                  	'class': 'minimap-chart-ele',
-			// 	                  	'x1': `${i / that.props.dataset_meta.subsamples.length * 100}%`,
-			// 	                  	'x2': `${i / that.props.dataset_meta.subsamples.length * 100}%`,
-			// 	                  	'y1': y(Math.max(d[0][0] - d[0][1], 1E-2)), // 1-sigma
-			// 	                  	'y2': y(d[0][0] + d[0][1])
-			// 	                  })
-			//                   });
 		})();
 		
 		// zoom to initial annotation if available
