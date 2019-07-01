@@ -298,11 +298,11 @@ export default class extends React.Component {
 			
 			const tf_str = `translate(${-this.x0(new_domain[0]) + this.px_x_shift}px, 0) scale(${this.props.tf.k}, 1)`;
 			this.area_canvas.current.style.transform = tf_str;
-			this.$gBrushes.selectAll('.brush')
-			              .each(function() {
-			              	const annotations = this.getAttribute('data-annotation').split('-');
-			              	that.move_brush(annotations.length > 1 ? annotations.map(i => that.props.annotations.get(parseInt(i))) : that.props.annotations.get(parseInt(annotations[0])));
-			              });
+			// this.$gBrushes.selectAll('.brush')
+			//               .each(function() {
+			//               	const annotations = this.getAttribute('data-annotation').split('-');
+			//               	that.move_brush(annotations.length > 1 ? annotations.map(i => that.props.annotations.get(parseInt(i))) : that.props.annotations.get(parseInt(annotations[0])));
+			//               });
 			              
 			this.minimap_brush.call(this.minimap_brusher.move, [this.minimap_x(new_domain[0]), this.minimap_x(new Date(new_domain[0].getTime() + FULL_RES_INTERVAL * 1000))])
 		
@@ -357,7 +357,6 @@ export default class extends React.Component {
 			    	annotation = annotation_;
 		    	}
 		    	
- 	 			console.log(this.state.is_brushing, d3.event.sourceEvent instanceof MouseEvent);
 	    	 	if(this.state.is_brushing && d3.event.sourceEvent instanceof MouseEvent) {
 	    	 		console.log('B', annotation, Array.isArray(annotation));
 	    	 		if(Array.isArray(annotation)) {
@@ -417,7 +416,7 @@ export default class extends React.Component {
 	updateBrushes() {
 		// If point, add brush, delete handles, add title (after)
 		// If range, add brush, add custom handles with titles
-		group_point_annotations(this.props.annotations.toList()).forEach(this.move_brush.bind(this));
+		// group_point_annotations(this.props.annotations.toList()).forEach(this.move_brush.bind(this));
 		// debugger;
 	}
 
